@@ -4,8 +4,8 @@ POST http://localhost:8000/start_simulation
 Content-Type: application/json
 
 {
-    "config_file": "/home/haoweis/TeraSim_Development/simulation_config.yaml",
-    "auto_run": true
+    "config_file": "/home/haoweis/TeraSim_Development/TeraSim-Service/simulation_config.yaml",
+    "auto_run": false
 }
 
 ### Store simulation_id in a variable
@@ -15,13 +15,13 @@ Content-Type: application/json
 GET http://localhost:8000/simulation_status/{{simulationId}}
 
 
-### Send a control command to the simulation
+### Send a control command to the simulation to pause, only works when auto_run is false
 POST http://localhost:8000/simulation_control/{{simulationId}}
 Content-Type: application/json
 
 {"command":"pause"}
 
-### send a control command to continue the simulation
+### send a control command to continue the simulation to resume, only works when auto_run is false
 POST http://localhost:8000/simulation_control/{{simulationId}}
 Content-Type: application/json
 
@@ -29,6 +29,6 @@ Content-Type: application/json
     "command": "resume"
 }
 
-### Tick the simulation (advance one step)
+### Tick the simulation (advance one step) only works when auto_run is false
 POST http://localhost:8000/simulation_tick/{{simulationId}}
 

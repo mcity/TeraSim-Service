@@ -1,0 +1,28 @@
+# ignore output_cav folder and .log file
+output_cav
+*.log
+*.pyc
+
+# Python standard ignores
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+*.env
+venv/
+ENV/
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
