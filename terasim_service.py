@@ -11,6 +11,7 @@ from terasim.simulator import Simulator
 from terasim.logger.infoextractor import InfoExtractor
 from terasim_nde_nade.vehicle.nde_vehicle_factory import NDEVehicleFactory
 from terasim_control_plugin import TeraSimControlPlugin
+from multiprocessing import Process
 
 description = """
 TeraSim Control Service API allows you to manage and control TeraSim simulations.
@@ -136,6 +137,11 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
         gc.collect()
 
 
+def run_simulation_process(simulation_id: str, config: dict, auto_run: bool):
+    # This function will run in a separate process
+    asyncio.run(run_simulation_task(simulation_id, config, auto_run))
+
+
 @app.post("/start_simulation", tags=["simulations"], summary="Start a new simulation")
 async def start_simulation(config: SimulationConfig):
     """
@@ -161,10 +167,12 @@ async def start_simulation(config: SimulationConfig):
         id=simulation_id, status="running"
     )
 
-    # Use asyncio.create_task to start the simulation
-    asyncio.create_task(
-        run_simulation_task(simulation_id, config_data, config.auto_run)
+    # Start the simulation in a new process
+    process = Process(
+        target=run_simulation_process,
+        args=(simulation_id, config_data, config.auto_run),
     )
+    process.start()
 
     return {"simulation_id": simulation_id, "message": "Simulation started"}
 
