@@ -35,7 +35,7 @@ simulator:
     sumo_net_file: "/home/haoweis/TeraSim_Development/TeraSim-NDE-ITE/example/maps/Mcity_safetest/mcity.net.xml"
     sumo_config_file: "/home/haoweis/TeraSim_Development/TeraSim-NDE-ITE/example/maps/Mcity_safetest/mcity.sumocfg"
     num_tries: 10
-    gui_flag: true
+    gui_flag: false
     realtime_flag: false  # Only applicable for AV mode
     sumo_output_file_types: 
       - "fcd_all"
