@@ -1,0 +1,53 @@
+simulation_module: "my_simulations"
+simulation_class: "CarSimulation"
+parameters:
+  num_cars: 10
+  simulation_time: 3600
+
+# Simulation type: Choose between "safetest_mcity_av" or "safetest_mcity"
+simulation_type: "safetest_mcity_av"
+
+output:
+  dir: "output_cav"  # Output directory (use "output" for non-AV simulations)
+  name: "test"  # Experiment name
+  nth: "0_0"  # Experiment number
+  aggregated_dir: "aggregated"  # Directory for aggregated logs
+
+environment:
+  # Module containing the environment class
+  module: "terasim_nde_nade.envs.safetest_nade_with_av"  # Use "terasim_nde_nade.envs.safetest_nade" for non-AV simulations
+  # Environment class name
+  class: "SafeTestNADEWithAV"  # Use "SafeTestNADE" for non-AV simulations
+  parameters:
+    # Vehicle factory class
+    vehicle_factory: "terasim_nde_nade.vehicle.nde_vehicle_factory.NDEVehicleFactory"
+    # Info extractor class
+    info_extractor: "terasim.logger.infoextractor.InfoExtractor"
+    log_flag: true
+    warmup_time_lb: 900  # Lower bound for warmup time
+    warmup_time_ub: 1200  # Upper bound for warmup time
+    run_time: 1200  # Simulation run time (use 30 for non-AV simulations)
+
+simulator:
+  module: "terasim.simulator"
+  class: "Simulator"
+  parameters:
+    sumo_net_file: "/home/haoweis/TeraSim_Development/TeraSim-NDE-ITE/example/maps/Mcity_safetest/mcity.net.xml"
+    sumo_config_file: "/home/haoweis/TeraSim_Development/TeraSim-NDE-ITE/example/maps/Mcity_safetest/mcity.sumocfg"
+    num_tries: 10
+    gui_flag: true
+    realtime_flag: false  # Only applicable for AV mode
+    sumo_output_file_types: 
+      - "fcd_all"
+      - "collision"
+      - "tripinfo"
+
+# New section for file paths
+file_paths:
+  sumo_net_file: "/home/haoweis/TeraSim_Development/TeraSim-NDE-ITE/example/maps/Mcity_safetest/mcity.net.xml"
+  sumo_config_file: "/home/haoweis/TeraSim_Development/TeraSim-NDE-ITE/example/maps/Mcity_safetest/mcity.sumocfg"
+
+logging:
+  levels:
+    - "TRACE"  # Log level for the main log file
+    - "INFO"   # Log level for the aggregated log file

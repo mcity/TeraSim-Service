@@ -1,0 +1,34 @@
+### Start a simulation
+# @name startSimulation
+POST http://localhost:8000/start_simulation
+Content-Type: application/json
+
+{
+    "config_file": "/home/haoweis/TeraSim_Development/simulation_config.yaml",
+    "auto_run": true
+}
+
+### Store simulation_id in a variable
+@simulationId = {{startSimulation.response.body.simulation_id}}
+
+### Check simulation status
+GET http://localhost:8000/simulation_status/{{simulationId}}
+
+
+### Send a control command to the simulation
+POST http://localhost:8000/simulation_control/{{simulationId}}
+Content-Type: application/json
+
+{"command":"pause"}
+
+### send a control command to continue the simulation
+POST http://localhost:8000/simulation_control/{{simulationId}}
+Content-Type: application/json
+
+{
+    "command": "resume"
+}
+
+### Tick the simulation (advance one step)
+POST http://localhost:8000/simulation_tick/{{simulationId}}
+
