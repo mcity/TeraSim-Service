@@ -94,35 +94,27 @@ class TeraSimControlPlugin:
     def on_step(self, simulator: Simulator, ctx):
         try:
             while True:
-                # Check if simulation is paused
-                if self.redis_client.get(f"sim:{self.simulation_uuid}:paused"):
+                command = self._get_and_handle_command(simulator)
+                if command == "stop":
+                    return True  # Exit the step immediately if stop command is received
+
+                if self._is_simulation_paused():
                     time.sleep(0.1)  # Wait while paused
                     continue
 
                 if not self.auto_run:
-                    command = self.redis_client.get(
-                        f"sim:{self.simulation_uuid}:control"
-                    )
-                    if command and command.decode("utf-8") == "tick":
-                        # clear tick command
-                        self.redis_client.delete(f"sim:{self.simulation_uuid}:control")
-                    elif command:
-                        # handle other commands (currently only "stop")
-                        self._handle_control_command(command, simulator)
-                        continue
-                    elif not command:
-                        time.sleep(0.005)  # short sleep to prevent busy waiting
+                    if command == "tick":
+                        break  # Proceed with the simulation step
+                    else:
+                        time.sleep(0.005)  # Short sleep to prevent busy waiting
                         continue
 
-                # continue simulation step
-                break
+                break  # Proceed with the simulation step in auto_run mode
 
             return True
         except RedisError as e:
             self.logger.error(f"Redis error during step: {e}")
-            if self._reconnect_redis():
-                return True
-            return False
+            return self._reconnect_redis()
         except Exception as e:
             self.logger.exception(f"Unexpected error during simulation step: {e}")
             return False
@@ -151,8 +143,19 @@ class TeraSimControlPlugin:
         simulator.step_pipeline.hook("control_step", self.on_step, priority=-90)
         simulator.stop_pipeline.hook("control_stop", self.on_stop, priority=-90)
 
+    def _get_and_handle_command(self, simulator):
+        command = self.redis_client.get(f"sim:{self.simulation_uuid}:control")
+        if command:
+            command = command.decode("utf-8")
+            self._handle_control_command(command, simulator)
+            if command != "stop":
+                self.redis_client.delete(f"sim:{self.simulation_uuid}:control")
+        return command
+
+    def _is_simulation_paused(self):
+        return bool(self.redis_client.get(f"sim:{self.simulation_uuid}:paused"))
+
     def _handle_control_command(self, command, simulator):
-        command = command.decode("utf-8")
         if command == "pause":
             self.redis_client.set(f"sim:{self.simulation_uuid}:paused", "1")
             self.logger.info("Simulation paused")
@@ -160,10 +163,9 @@ class TeraSimControlPlugin:
             self.redis_client.delete(f"sim:{self.simulation_uuid}:paused")
             self.logger.info("Simulation resumed")
         elif command == "stop":
-            simulator.stop()
-            self.logger.info("Simulation stopped")
+            self.logger.info("Stopping simulation")
+            simulator.soft_request_stop()
         # Add more control command handling logic as needed
-        self.redis_client.delete(f"sim:{self.simulation_uuid}:control")
 
     def _write_simulation_state(self, simulator):
         # Write simulation state to Redis with expiration
