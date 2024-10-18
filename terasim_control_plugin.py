@@ -79,6 +79,10 @@ class TeraSimControlPlugin:
             self.logger.info(
                 f"Redis connection established. Simulation UUID: {self.simulation_uuid}"
             )
+
+            # Add this line to write initial simulation state
+            # self._write_simulation_state(simulator)
+
             return True
         except RedisError as e:
             self.logger.error(f"Failed to initialize Redis: {e}")
