@@ -12,6 +12,8 @@ from terasim.logger.infoextractor import InfoExtractor
 from terasim_nde_nade.vehicle.nde_vehicle_factory import NDEVehicleFactory
 from terasim_control_plugin import TeraSimControlPlugin
 from multiprocessing import Process
+import redis
+import sys
 
 description = """
 TeraSim Control Service API allows you to manage and control TeraSim simulations.
@@ -230,8 +232,6 @@ async def control_simulation(
     - dict: A dictionary containing a message about the sent command
     """
     try:
-        import redis
-
         redis_client = redis.Redis()
         if command.command == "resume":
             redis_client.delete(f"sim:{simulation_id}:paused")
@@ -268,8 +268,6 @@ async def tick_simulation(simulation_id: str = Depends(get_simulation_id)):
     - dict: A dictionary containing a message about the sent tick command
     """
     try:
-        import redis
-
         redis_client = redis.Redis()
         redis_client.set(f"sim:{simulation_id}:control", "tick")
         return {"message": f"Tick command sent to simulation {simulation_id}"}
@@ -320,7 +318,29 @@ async def get_simulation_results(simulation_id: str = Depends(get_simulation_id)
         return {"simulation_id": simulation_id, "status": status, "results": results}
 
 
+# Add this function to check Redis connection
+def check_redis_connection():
+    try:
+        redis_client = redis.Redis(host="localhost", port=6379, db=0)
+        redis_client.ping()
+        logger.info("Successfully connected to Redis")
+    except redis.ConnectionError:
+        logger.error("Failed to connect to Redis. Exiting...")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     import uvicorn
 
+    # Check Redis connection before starting the service
+    check_redis_connection()
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
+    # start simulation here
+    # config_file = (
+    #     "/home/haoweis/TeraSim_Development/TeraSim-Service/simulation_config.yaml"
+    # )
+    # auto_run = True
+    # simulation_config = SimulationConfig(config_file=config_file, auto_run=auto_run)
+
+    # asyncio.run(start_simulation(simulation_config))
