@@ -8,7 +8,7 @@ from redis.exceptions import RedisError
 import uuid
 import logging
 from logging.handlers import RotatingFileHandler
-
+import json
 from terasim.overlay import traci
 from terasim.simulator import Simulator
 
@@ -92,43 +92,53 @@ class TeraSimControlPlugin:
             return False
 
     def on_step(self, simulator: Simulator, ctx):
-        try:
-            while True:
-                command = self._get_and_handle_command(simulator)
-                if command == "stop":
-                    return True  # Exit the step immediately if stop command is received
+        while True:
+            # Handle simulation control commands
+            command = self._get_and_handle_command(simulator)
+            if command == "stop":
+                return True
 
-                if self._is_simulation_paused():
-                    time.sleep(0.1)  # Wait while paused
+            # Handle all pending vehicle commands
+            self._handle_pending_vehicle_commands()
+
+            # Write current simulation state
+            self._write_simulation_state(simulator)
+
+            if self._is_simulation_paused():
+                time.sleep(0.1)  # Wait while paused
+                continue
+
+            if not self.auto_run:
+                if command == "tick":
+                    break  # Proceed with the simulation step
+                else:
+                    time.sleep(0.005)  # Short sleep to prevent busy waiting
                     continue
 
-                if not self.auto_run:
-                    if command == "tick":
-                        break  # Proceed with the simulation step
-                    else:
-                        time.sleep(0.005)  # Short sleep to prevent busy waiting
-                        continue
+            break  # Proceed with the simulation step in auto_run mode
 
-                break  # Proceed with the simulation step in auto_run mode
-
-            return True
-        except RedisError as e:
-            self.logger.error(f"Redis error during step: {e}")
-            return self._reconnect_redis()
-        except Exception as e:
-            self.logger.exception(f"Unexpected error during simulation step: {e}")
-            return False
+        return True
 
     def on_stop(self, simulator: Simulator, ctx):
         try:
             if self.redis_client:
-                # Set simulation end status with expiration
+                # Set simulation end status briefly before cleanup
                 self.redis_client.set(
-                    f"sim:{self.simulation_uuid}:status", "finished", ex=self.key_expiry
+                    f"sim:{self.simulation_uuid}:status",
+                    "finished",
+                    ex=10,  # Keep status for 10 seconds only
                 )
+
+                # Clean up all simulation related data
+                keys_pattern = f"sim:{self.simulation_uuid}:*"
+                for key in self.redis_client.scan_iter(match=keys_pattern):
+                    self.redis_client.delete(key)
+
                 # Close Redis connection
                 self.redis_client.close()
-                self.logger.info("Redis connection closed.")
+                self.logger.info(
+                    f"Simulation {self.simulation_uuid} stopped and data cleaned up"
+                )
         except RedisError as e:
             self.logger.error(f"Error during Redis cleanup: {e}")
         except Exception as e:
@@ -143,17 +153,25 @@ class TeraSimControlPlugin:
         simulator.step_pipeline.hook("control_step", self.on_step, priority=-90)
         simulator.stop_pipeline.hook("control_stop", self.on_stop, priority=-90)
 
-    def _get_and_handle_command(self, simulator):
+    def _get_and_handle_command(self, simulator: Simulator) -> str | None:
+        # Check if simulation exists
+        # if not self.redis_client.exists(f"sim:{self.simulation_uuid}:state"):
+        #     self.logger.error(f"Simulation {self.simulation_uuid} does not exist")
+        #     return "stop"  # Stop the simulation if it doesn't exist in Redis
+
         command = self.redis_client.get(f"sim:{self.simulation_uuid}:control")
         if command:
             command = command.decode("utf-8")
-            self._handle_control_command(command, simulator)
-            if command != "stop":
-                self.redis_client.delete(f"sim:{self.simulation_uuid}:control")
+            self.redis_client.delete(f"sim:{self.simulation_uuid}:control")
         return command
 
-    def _is_simulation_paused(self):
-        return bool(self.redis_client.get(f"sim:{self.simulation_uuid}:paused"))
+    def _is_simulation_paused(self) -> bool:
+        # Check if simulation exists
+        # if not self.redis_client.exists(f"sim:{self.simulation_uuid}:state"):
+        #     self.logger.error(f"Simulation {self.simulation_uuid} does not exist")
+        #     return False
+
+        return bool(self.redis_client.exists(f"sim:{self.simulation_uuid}:paused"))
 
     def _handle_control_command(self, command, simulator):
         if command == "pause":
@@ -168,17 +186,63 @@ class TeraSimControlPlugin:
         # Add more control command handling logic as needed
 
     def _write_simulation_state(self, simulator):
-        # Write simulation state to Redis with expiration
-        vehicle_count = len(traci.vehicle.getIDList())
-        self.redis_client.hset(
-            f"sim:{self.simulation_uuid}:state",
-            mapping={
-                "step": simulator.step,
-                "vehicle_count": vehicle_count,
-                "simulation_time": simulator.simulation_time,
-            },
-        )
-        self.redis_client.expire(f"sim:{self.simulation_uuid}:state", self.key_expiry)
+        try:
+            # Get all vehicle IDs
+            vehicle_ids = traci.vehicle.getIDList()
+
+            # Basic simulation state
+            state = {
+                "vehicle_count": len(vehicle_ids),
+                "simulation_time": traci.simulation.getTime(),
+            }
+
+            # Add vehicle states
+            vehicles = {}
+            for vid in vehicle_ids:
+                vehicles[vid] = {
+                    "position": traci.vehicle.getPosition(vid),  # (x,y)
+                    "speed": traci.vehicle.getSpeed(vid),
+                    "angle": traci.vehicle.getAngle(vid),
+                }
+
+            state["vehicles"] = vehicles
+
+            # Write to Redis with expiration
+            self.redis_client.hset(
+                f"sim:{self.simulation_uuid}:state", mapping={"data": json.dumps(state)}
+            )
+            self.redis_client.expire(
+                f"sim:{self.simulation_uuid}:state", self.key_expiry
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error writing simulation state: {e}")
+
+    def _handle_vehicle_command(self, command_data):
+        """Handle vehicle control commands"""
+        try:
+            vehicle_id = command_data["vehicle_id"]
+            command_type = command_data["type"]
+
+            if command_type == "set_state":
+                if "position" in command_data:
+                    x, y = command_data["position"]
+                    traci.vehicle.moveToXY(
+                        vehicle_id, "", 0, x, y, command_data.get("angle", 0), 2
+                    )
+
+                if "speed" in command_data:
+                    traci.vehicle.setSpeed(vehicle_id, command_data["speed"])
+
+                if "angle" in command_data:
+                    traci.vehicle.setAngle(vehicle_id, command_data["angle"])
+
+            self.logger.info(f"Vehicle command executed: {command_data}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Error handling vehicle command: {e}")
+            return False
 
     def _reconnect_redis(self):
         try:
@@ -189,3 +253,19 @@ class TeraSimControlPlugin:
         except RedisError as e:
             self.logger.error(f"Failed to reconnect to Redis: {e}")
             return False
+
+    def _handle_pending_vehicle_commands(self):
+        """Handle all pending vehicle commands in the queue"""
+        try:
+            # Process up to 100 commands per step to prevent infinite loops
+            for _ in range(100):
+                command_data = self.redis_client.lpop(
+                    f"sim:{self.simulation_uuid}:vehicle_commands"
+                )
+                if not command_data:
+                    break
+
+                command = json.loads(command_data.decode("utf-8"))
+                self._handle_vehicle_command(command)
+        except Exception as e:
+            self.logger.error(f"Error handling pending vehicle commands: {e}")

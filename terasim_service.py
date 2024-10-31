@@ -14,6 +14,7 @@ from terasim_control_plugin import TeraSimControlPlugin
 from multiprocessing import Process
 import redis
 import sys
+import json
 
 description = """
 TeraSim Control Service API allows you to manage and control TeraSim simulations.
@@ -65,6 +66,28 @@ class SimulationCommand(BaseModel):
     command: str = Field(
         ...,
         description="Control command for the simulation (e.g., 'pause', 'resume', 'stop')",
+    )
+
+
+class VehicleState(BaseModel):
+    position: tuple[float, float] | None = Field(
+        None, description="Vehicle position (x,y)"
+    )
+    speed: float | None = Field(None, description="Vehicle speed")
+    angle: float | None = Field(None, description="Vehicle angle")
+
+
+class VehicleCommand(BaseModel):
+    vehicle_id: str = Field(..., description="ID of the target vehicle")
+    type: str = Field(..., description="Command type (e.g., 'set_state')")
+    position: tuple[float, float] | None = None
+    speed: float | None = None
+    angle: float | None = None
+
+
+class VehicleCommandBatch(BaseModel):
+    commands: list[VehicleCommand] = Field(
+        ..., description="List of vehicle commands to execute"
     )
 
 
@@ -316,6 +339,74 @@ async def get_simulation_results(simulation_id: str = Depends(get_simulation_id)
             "Simulation results here"  # Replace with actual result retrieval logic
         )
         return {"simulation_id": simulation_id, "status": status, "results": results}
+
+
+@app.get(
+    "/simulation/{simulation_id}/vehicles",
+    tags=["vehicles"],
+    summary="Get all vehicle states",
+)
+async def get_vehicle_states(simulation_id: str = Depends(get_simulation_id)):
+    """
+    Get the current state of all vehicles in the simulation.
+    """
+    try:
+        redis_client = redis.Redis()
+        state = redis_client.hget(f"sim:{simulation_id}:state", "data")
+        if not state:
+            raise HTTPException(status_code=404, detail="Simulation state not found")
+
+        return json.loads(state.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post(
+    "/simulation/{simulation_id}/vehicle_command",
+    tags=["vehicles"],
+    summary="Send command to control a vehicle",
+)
+async def control_vehicle(
+    simulation_id: str = Depends(get_simulation_id), command: VehicleCommand = Body(...)
+):
+    """
+    Send a command to control a specific vehicle in the simulation.
+    """
+    try:
+        redis_client = redis.Redis()
+        redis_client.rpush(
+            f"sim:{simulation_id}:vehicle_commands", json.dumps(command.dict())
+        )
+        return {"message": f"Vehicle command sent for vehicle {command.vehicle_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post(
+    "/simulation/{simulation_id}/vehicle_commands_batch",
+    tags=["vehicles"],
+    summary="Send multiple commands to control vehicles",
+)
+async def control_vehicles_batch(
+    simulation_id: str = Depends(get_simulation_id),
+    command_batch: VehicleCommandBatch = Body(...),
+):
+    """
+    Send multiple commands to control different vehicles in the simulation.
+    Commands will be executed in the order they are provided.
+    """
+    try:
+        redis_client = redis.Redis()
+        # Add all commands to the queue
+        for command in command_batch.commands:
+            redis_client.rpush(
+                f"sim:{simulation_id}:vehicle_commands", json.dumps(command.dict())
+            )
+        return {
+            "message": f"Batch of {len(command_batch.commands)} vehicle commands sent successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Add this function to check Redis connection
