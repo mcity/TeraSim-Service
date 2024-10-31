@@ -153,24 +153,33 @@ class TeraSimControlPlugin:
         simulator.step_pipeline.hook("control_step", self.on_step, priority=-90)
         simulator.stop_pipeline.hook("control_stop", self.on_stop, priority=-90)
 
-    def _get_and_handle_command(self, simulator: Simulator) -> str | None:
-        # Check if simulation exists
-        # if not self.redis_client.exists(f"sim:{self.simulation_uuid}:state"):
-        #     self.logger.error(f"Simulation {self.simulation_uuid} does not exist")
-        #     return "stop"  # Stop the simulation if it doesn't exist in Redis
+    def _check_simulation_status(self) -> bool:
+        """Check if simulation is still running
+        Returns:
+            bool: True if simulation is running, False if stopped or doesn't exist
+        """
+        status = self.redis_client.get(f"sim:{self.simulation_uuid}:status")
+        if not status or status.decode("utf-8") == "finished":
+            self.logger.warning(
+                f"Simulation {self.simulation_uuid} is stopped or doesn't exist"
+            )
+            return False
+        return True
 
+    def _get_and_handle_command(self, simulator: Simulator) -> str | None:
+        if not self._check_simulation_status():
+            return "stop"
         command = self.redis_client.get(f"sim:{self.simulation_uuid}:control")
         if command:
             command = command.decode("utf-8")
-            self.redis_client.delete(f"sim:{self.simulation_uuid}:control")
+            self._handle_control_command(command, simulator)
+            if command != "stop":
+                self.redis_client.delete(f"sim:{self.simulation_uuid}:control")
         return command
 
     def _is_simulation_paused(self) -> bool:
-        # Check if simulation exists
-        # if not self.redis_client.exists(f"sim:{self.simulation_uuid}:state"):
-        #     self.logger.error(f"Simulation {self.simulation_uuid} does not exist")
-        #     return False
-
+        if not self._check_simulation_status():
+            return False
         return bool(self.redis_client.exists(f"sim:{self.simulation_uuid}:paused"))
 
     def _handle_control_command(self, command, simulator):
@@ -186,6 +195,8 @@ class TeraSimControlPlugin:
         # Add more control command handling logic as needed
 
     def _write_simulation_state(self, simulator):
+        if not self._check_simulation_status():
+            return
         try:
             # Get all vehicle IDs
             vehicle_ids = traci.vehicle.getIDList()
@@ -255,6 +266,8 @@ class TeraSimControlPlugin:
             return False
 
     def _handle_pending_vehicle_commands(self):
+        if not self._check_simulation_status():
+            return
         """Handle all pending vehicle commands in the queue"""
         try:
             # Process up to 100 commands per step to prevent infinite loops

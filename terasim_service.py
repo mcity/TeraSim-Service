@@ -208,6 +208,16 @@ def get_simulation_id(simulation_id: str):
     return simulation_id
 
 
+def check_simulation_running(simulation_id: str, redis_client: redis.Redis) -> bool:
+    """Check if a simulation is still running in Redis
+
+    Returns:
+        bool: True if simulation is running, False if stopped or doesn't exist
+    """
+    status = redis_client.get(f"sim:{simulation_id}:status")
+    return status is not None and status.decode("utf-8") != "finished"
+
+
 @app.get(
     "/simulation_status/{simulation_id}",
     tags=["simulations"],
@@ -227,7 +237,15 @@ async def get_simulation_status(simulation_id: str = Depends(get_simulation_id))
     Returns:
     - SimulationStatus: Object containing the current status of the simulation
     """
-    return running_simulations[simulation_id]
+    try:
+        redis_client = redis.Redis()
+        if not check_simulation_running(simulation_id, redis_client):
+            raise HTTPException(
+                status_code=404, detail="Simulation not found or finished"
+            )
+        return running_simulations[simulation_id]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post(
@@ -256,6 +274,11 @@ async def control_simulation(
     """
     try:
         redis_client = redis.Redis()
+        if not check_simulation_running(simulation_id, redis_client):
+            raise HTTPException(
+                status_code=404, detail="Simulation not found or finished"
+            )
+
         if command.command == "resume":
             redis_client.delete(f"sim:{simulation_id}:paused")
         elif command.command == "pause":
@@ -292,6 +315,11 @@ async def tick_simulation(simulation_id: str = Depends(get_simulation_id)):
     """
     try:
         redis_client = redis.Redis()
+        if not check_simulation_running(simulation_id, redis_client):
+            raise HTTPException(
+                status_code=404, detail="Simulation not found or finished"
+            )
+
         redis_client.set(f"sim:{simulation_id}:control", "tick")
         return {"message": f"Tick command sent to simulation {simulation_id}"}
     except Exception as e:
@@ -352,6 +380,11 @@ async def get_vehicle_states(simulation_id: str = Depends(get_simulation_id)):
     """
     try:
         redis_client = redis.Redis()
+        if not check_simulation_running(simulation_id, redis_client):
+            raise HTTPException(
+                status_code=404, detail="Simulation not found or finished"
+            )
+
         state = redis_client.hget(f"sim:{simulation_id}:state", "data")
         if not state:
             raise HTTPException(status_code=404, detail="Simulation state not found")
@@ -374,6 +407,11 @@ async def control_vehicle(
     """
     try:
         redis_client = redis.Redis()
+        if not check_simulation_running(simulation_id, redis_client):
+            raise HTTPException(
+                status_code=404, detail="Simulation not found or finished"
+            )
+
         redis_client.rpush(
             f"sim:{simulation_id}:vehicle_commands", json.dumps(command.dict())
         )
@@ -397,6 +435,11 @@ async def control_vehicles_batch(
     """
     try:
         redis_client = redis.Redis()
+        if not check_simulation_running(simulation_id, redis_client):
+            raise HTTPException(
+                status_code=404, detail="Simulation not found or finished"
+            )
+
         # Add all commands to the queue
         for command in command_batch.commands:
             redis_client.rpush(
