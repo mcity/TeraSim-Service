@@ -9,7 +9,7 @@ BASE_URL = "http://localhost:8000"
 def simulation_id():
     # Start a simulation and return the simulation_id
     config = {
-        "config_file": "/home/haoweis/TeraSim_Development/TeraSim-Service/simulation_config.yaml",
+        "config_file": "/home/haoweis/terasim_vru_dev/TeraSim-Service/simulation_config.yaml",
         "auto_run": True,
     }
     response = requests.post(f"{BASE_URL}/start_simulation", json=config)
@@ -25,7 +25,7 @@ def simulation_id():
 
 def test_start_simulation():
     config = {
-        "config_file": "/home/haoweis/TeraSim_Development/TeraSim-Service/simulation_config.yaml",
+        "config_file": "/home/haoweis/terasim_vru_dev/TeraSim-Service/simulation_config.yaml",
         "auto_run": True,
     }
     response = requests.post(f"{BASE_URL}/start_simulation", json=config)
@@ -73,7 +73,7 @@ def test_tick_simulation(simulation_id):
 @pytest.mark.parametrize("auto_run", [True, False])
 def test_simulation_with_auto_run(auto_run):
     config = {
-        "config_file": "/home/haoweis/TeraSim_Development/TeraSim-Service/simulation_config.yaml",
+        "config_file": "/home/haoweis/terasim_vru_dev/TeraSim-Service/simulation_config.yaml",
         "auto_run": auto_run,
     }
     response = requests.post(f"{BASE_URL}/start_simulation", json=config)

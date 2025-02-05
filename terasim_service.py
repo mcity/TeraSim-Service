@@ -472,7 +472,7 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
     # start simulation here
     # config_file = (
-    #     "/home/haoweis/TeraSim_Development/TeraSim-Service/simulation_config.yaml"
+    #     "/home/haoweis/terasim_vru_dev/TeraSim-Service/simulation_config.yaml"
     # )
     # auto_run = True
     # simulation_config = SimulationConfig(config_file=config_file, auto_run=auto_run)

@@ -4,7 +4,7 @@ POST http://localhost:8000/start_simulation
 Content-Type: application/json
 
 {
-    "config_file": "/home/haoweis/TeraSim_Development/TeraSim-Service/simulation_config.yaml",
+    "config_file": "/home/haoweis/terasim_vru_dev/TeraSim-Service/simulation_config.yaml",
     "auto_run": false
 }
 
