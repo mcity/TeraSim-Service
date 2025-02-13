@@ -43,7 +43,7 @@ GET  /simulation_results/{sim_id}   # Retrieve simulation results
 3. Start Redis server:
    ```bash
    sudo systemctl enable redis-server
-  sudo systemctl start redis-server
+   sudo systemctl start redis-server
    # Verify Redis is running
    redis-cli ping
    # Should return "PONG"
