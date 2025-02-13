@@ -1,20 +1,21 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from fastapi import FastAPI, HTTPException, Body, Depends
-from pydantic import BaseModel, Field
-import yaml
-from pathlib import Path
 import importlib
-from loguru import logger
+import json
+import sys
 import uuid
-from terasim.simulator import Simulator
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Process
+from pathlib import Path
+
+import redis
+import yaml
+from fastapi import Body, Depends, FastAPI, HTTPException
+from loguru import logger
+from pydantic import BaseModel, Field
 from terasim.logger.infoextractor import InfoExtractor
+from terasim.simulator import Simulator
 from terasim_nde_nade.vehicle.nde_vehicle_factory import NDEVehicleFactory
 from terasim_service_plugin import TeraSimControlPlugin
-from multiprocessing import Process
-import redis
-import sys
-import json
 
 description = """
 TeraSim Control Service API allows you to manage and control TeraSim simulations.

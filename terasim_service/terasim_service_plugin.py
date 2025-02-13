@@ -1,14 +1,15 @@
-import os
+import json
+import logging
 import math
+import os
 import time
-import sumolib
+import uuid
+from logging.handlers import RotatingFileHandler
+
 import lxml.etree as ET
 import redis
+import sumolib
 from redis.exceptions import RedisError
-import uuid
-import logging
-from logging.handlers import RotatingFileHandler
-import json
 from terasim.overlay import traci
 from terasim.simulator import Simulator
 
