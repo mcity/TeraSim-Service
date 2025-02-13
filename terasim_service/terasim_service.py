@@ -10,7 +10,7 @@ import uuid
 from terasim.simulator import Simulator
 from terasim.logger.infoextractor import InfoExtractor
 from terasim_nde_nade.vehicle.nde_vehicle_factory import NDEVehicleFactory
-from terasim_control_plugin import TeraSimControlPlugin
+from terasim_service_plugin import TeraSimControlPlugin
 from multiprocessing import Process
 import redis
 import sys

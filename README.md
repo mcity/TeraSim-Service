@@ -1,8 +1,12 @@
-# TeraSim Control Service
+# TeraSim Service
 
-TeraSim Control Service is a FastAPI-based web service that allows users to start, control, and monitor TeraSim simulations remotely. It provides a RESTful API for managing simulation instances and interacting with them in real-time.
+A HTTP service for TeraSim simulation control and monitoring, built with FastAPI.
 
-## Features
+## Overview
+
+TeraSim Service provides a comprehensive HTTP API for managing simulation instances, enabling remote control and real-time monitoring capabilities.
+
+## Core Functionalities
 
 - Start new simulation instances
 - Check simulation status
@@ -10,83 +14,78 @@ TeraSim Control Service is a FastAPI-based web service that allows users to star
 - Manually advance simulation steps (tick)
 - Retrieve simulation results
 
-## Prerequisites
+## API Endpoints
 
-- Python 3.7+
+```
+POST /start_simulation              # Start a new simulation
+GET  /simulation_status/{sim_id}    # Check simulation status
+POST /simulation_control/{sim_id}   # Control simulation
+POST /simulation_tick/{sim_id}      # Advance simulation step
+GET  /simulation_results/{sim_id}   # Retrieve simulation results
+```
+
+## Requirements
+
+- Python 3.9+
 - Redis server
 - TeraSim and its dependencies
 
-## Installation
+## Setup
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/your-username/TeraSim-Service.git
-   cd TeraSim-Service
+1. Install TeraSim package:
+   ```bash
+   pip install terasim
    ```
 
-2. Install the required dependencies:
+2. Install Redis:
+   For details, check [this link](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/install-redis-on-linux/)
+
+3. Start Redis server:
+   ```bash
+   sudo systemctl enable redis-server
+  sudo systemctl start redis-server
+   # Verify Redis is running
+   redis-cli ping
+   # Should return "PONG"
    ```
+
+4. Install service dependencies:
+   ```bash
    pip install -r requirements.txt
    ```
 
-3. Ensure Redis is installed and running on your system.
-
-## Configuration
-
-1. Update the `simulation_config.yaml` file with your desired simulation parameters.
-
-2. Modify the `terasim_service.py` file if you need to adjust the maximum number of concurrent simulations or other service-specific settings.
-
-## Usage
-
-1. Start the TeraSim Control Service:
-   ```
+5. Start the service:
+   ```bash
    python terasim_service.py
    ```
 
-2. Use the provided REST API endpoints to interact with the service:
-
-   - Start a new simulation:
-     ```
-     POST /start_simulation
-     ```
-
-   - Check simulation status:
-     ```
-     GET /simulation_status/{simulation_id}
-     ```
-
-   - Control simulation:
-     ```
-     POST /simulation_control/{simulation_id}
-     ```
-
-   - Advance simulation step:
-     ```
-     POST /simulation_tick/{simulation_id}
-     ```
-
-   - Retrieve simulation results:
-     ```
-     GET /simulation_results/{simulation_id}
-     ```
-
-3. You can use the `terasim_request.rest` file as a reference for making API calls using a REST client.
-
 ## API Documentation
 
-Once the service is running, you can access the auto-generated API documentation at:
-
+Interactive API documentation available at:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+Copyright 2024 TeraSim Service Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-[Specify your license here]
 
 ## Support
 
