@@ -12,16 +12,18 @@ TeraSim Service provides a comprehensive HTTP API for managing simulation instan
 - Check simulation status
 - Control simulations (pause, resume, stop)
 - Manually advance simulation steps (tick)
-- Retrieve simulation results
+- Retrieve simulation states
+- Send commands to agents
 
 ## API Endpoints
 
 ```
-POST /start_simulation              # Start a new simulation
-GET  /simulation_status/{sim_id}    # Check simulation status
-POST /simulation_control/{sim_id}   # Control simulation
-POST /simulation_tick/{sim_id}      # Advance simulation step
-GET  /simulation_results/{sim_id}   # Retrieve simulation results
+POST /start_simulation                    # Start a new simulation
+GET  /simulation_status/{sim_id}          # Check simulation status
+POST /simulation_control/{sim_id}         # Control simulation
+POST /simulation_tick/{sim_id}            # Advance simulation step
+GET  /simulation/{sim_id}/state           # Retrieve simulation states
+POST /simulation/{sim_id}/agent_command   # Send command to agent
 ```
 
 ## Requirements
@@ -49,14 +51,14 @@ GET  /simulation_results/{sim_id}   # Retrieve simulation results
    # Should return "PONG"
    ```
 
-4. Install service dependencies:
+4. Install TeraSim-Service package:
    ```bash
-   pip install -r requirements.txt
+   poetry install
    ```
 
 5. Start the service:
    ```bash
-   python terasim_service.py
+   python examples/main.py
    ```
 
 ## API Documentation
