@@ -1,2 +1,7 @@
-from .base import TeraSimPlugin
+from .base import BasePlugin
 from .cosim import TeraSimCoSimPlugin
+
+__all__ = [
+    "BasePlugin", 
+    "TeraSimCoSimPlugin"
+]
