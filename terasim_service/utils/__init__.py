@@ -4,7 +4,7 @@ from .messages import (
     SUMOSignal, 
     AgentCommand
 )
-from .service import (
+from .base import (
     check_redis_connection,
     create_environment,
     create_simulator,

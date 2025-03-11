@@ -126,7 +126,7 @@ environment:
           _convert_: 'all'
           location: 'crosswalk'
           ego_type: 'vulnerable_road_user'
-          probability: 0.1
+          probability: 0.001
           predicted_collision_type: "intersection_jaywalking"
 
         runningredlight:
@@ -134,7 +134,7 @@ environment:
           _convert_: 'all'
           location: 'crosswalk'
           ego_type: 'vulnerable_road_user'
-          probability: 0.1
+          probability: 0.001
           predicted_collision_type: "intersection_runningredlight"
 
         stopcrossing:
@@ -142,7 +142,7 @@ environment:
           _convert_: 'all'
           location: 'crosswalk'
           ego_type: 'vulnerable_road_user'
-          probability: 0.1
+          probability: 0.001
           predicted_collision_type: "intersection_stopcrossing"
 
     CAV_cfg:

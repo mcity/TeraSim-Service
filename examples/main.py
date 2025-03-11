@@ -10,7 +10,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException
 from loguru import logger
 
 
-from terasim_service.plugins import TeraSimCoSimPlugin
+from terasim_service.plugins import TeraSimCoSimPluginBefore, TeraSimCoSimPluginAfter
 from terasim_service.utils import (
     check_redis_connection,
     create_environment,
@@ -67,10 +67,14 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
         sim.bind_env(env)
 
         # Create and inject TeraSimControlPlugin
-        control_plugin = TeraSimCoSimPlugin(
+        control_plugin_before = TeraSimCoSimPluginBefore(
             simulation_uuid=simulation_id, auto_run=auto_run
         )
-        control_plugin.inject(sim, {})
+        control_plugin_before.inject(sim, {})
+        control_plugin_after = TeraSimCoSimPluginAfter(
+            simulation_uuid=simulation_id, auto_run=auto_run
+        )
+        control_plugin_after.inject(sim, {})
 
         # Run the simulation
         await asyncio.get_event_loop().run_in_executor(executor, sim.run)
@@ -116,7 +120,7 @@ async def start_simulation(config: SimulationConfig):
     config_data = load_config(config.config_file)
     simulation_id = str(uuid.uuid4())
     running_simulations[simulation_id] = SimulationStatus(
-        id=simulation_id, status="running"
+        id=simulation_id, status="started"
     )
 
     # Start the simulation in a new process
@@ -170,6 +174,7 @@ async def get_simulation_status(simulation_id: str = Depends(get_simulation_id))
             raise HTTPException(
                 status_code=404, detail="Simulation not found or finished"
             )
+        running_simulations[simulation_id].status = redis_client.get(f"simulation:{simulation_id}:status").decode("utf-8")
         return running_simulations[simulation_id]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

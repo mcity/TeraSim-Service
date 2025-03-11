@@ -1,124 +1,31 @@
-import importlib
-from loguru import logger
-from omegaconf import OmegaConf
-from pathlib import Path
-from pydantic import BaseModel, Field
-import redis
-import sys
-import yaml
-
-from terasim.logger.infoextractor import InfoExtractor
-from terasim.simulator import Simulator
-
-from terasim_nde_nade.vehicle import NDEVehicleFactory
-from terasim_nde_nade.vru import NDEVulnerableRoadUserFactory
-
-from .messages import AgentCommand
+import requests
 
 
-class SimulationConfig(BaseModel):
-    config_file: str = Field(
-        ..., description="Path to the simulation configuration file"
-    )
-    auto_run: bool = Field(
-        False,
-        description="Whether to automatically run the simulation or wait for manual control",
-    )
+def start_terasim(host, port, command):
+    url = f"http://{host}:{port}/start_simulation"
+    response = requests.post(url, json=command)
+    return response.json()
 
+def control_terasim(host, port, simulationId, command):
+    url = f"http://{host}:{port}/simulation_control/{simulationId}"
+    response = requests.post(url, json=command)
+    return response.json()
 
-class SimulationStatus(BaseModel):
-    id: str = Field(..., description="Unique identifier for the simulation")
-    status: str = Field(..., description="Current status of the simulation")
-    progress: float = Field(
-        0.0, description="Progress of the simulation as a percentage"
-    )
+def stop_terasim(host, port, simulationId):
+    response = control_terasim(host, port, simulationId, {"command": "stop"})
+    return response
 
+def tick_terasim(host, port, simulationId):
+    url = f"http://{host}:{port}/simulation_tick/{simulationId}"
+    response = requests.post(url)
+    return response.json()
 
-class SimulationCommand(BaseModel):
-    command: str = Field(
-        ...,
-        description="Control command for the simulation (e.g., 'pause', 'resume', 'stop')",
-    )
+def get_terasim_status(host, port, simulationId):
+    url = f"http://{host}:{port}/simulation_status/{simulationId}"
+    response = requests.get(url)
+    return response.json()
 
-
-class AgentCommandBatch(BaseModel):
-    commands: list[AgentCommand] = Field(
-        ..., description="List of agent commands to execute"
-    )
-
-
-def load_config(config_file):
-    """Load the configuration file.
-
-    Args:
-        config_file (str): Path to the configuration file.
-
-    Returns:
-        dict: The configuration dictionary.
-    """
-    with open(config_file, "r") as file:
-        return yaml.safe_load(file)
-
-
-def create_environment(config, base_dir):
-    """Create the environment based on the configuration.
-
-    Args:
-        config (dict): The configuration dictionary.
-        base_dir (str): Base directory for the environment.
-
-    Returns:
-        Environment: The environment object.
-    """
-    env_module = importlib.import_module(config["environment"]["module"])
-    env_class = getattr(env_module, config["environment"]["class"])
-
-    env_params = OmegaConf.create(config["environment"]["parameters"])
-
-    return env_class(
-        cav_cfg = env_params.CAV_cfg,
-        vehicle_factory=NDEVehicleFactory(env_params),
-        vru_factory=NDEVulnerableRoadUserFactory(env_params),
-        info_extractor=InfoExtractor,
-        log_flag=config["environment"]["parameters"]["log_flag"],
-        log_dir=base_dir,
-        warmup_time_lb=config["environment"]["parameters"]["warmup_time_lb"],
-        warmup_time_ub=config["environment"]["parameters"]["warmup_time_ub"],
-        run_time=config["environment"]["parameters"]["run_time"],
-    )
-
-
-def create_simulator(config, base_dir):
-    """Create the simulator based on the configuration.
-
-    Args:
-        config (dict): The configuration dictionary.
-        base_dir (str): Base directory for the simulator.
-
-    Returns:
-        Simulator: The simulator object.
-    """
-    return Simulator(
-        sumo_net_file_path=Path(config["file_paths"]["sumo_net_file"]),
-        sumo_config_file_path=Path(config["file_paths"]["sumo_config_file"]),
-        num_tries=config["simulator"]["parameters"]["num_tries"],
-        gui_flag=config["simulator"]["parameters"]["gui_flag"],
-        realtime_flag=config["simulator"]["parameters"].get("realtime_flag", False),
-        output_path=base_dir,
-        sumo_output_file_types=config["simulator"]["parameters"][
-            "sumo_output_file_types"
-        ],
-        additional_sumo_args=["--start", "--quit-on-end"],
-    )
-
-# Add this function to check Redis connection
-def check_redis_connection():
-    """Check the connection to Redis.
-    """
-    try:
-        redis_client = redis.Redis(host="localhost", port=6379, db=0)
-        redis_client.ping()
-        logger.info("Successfully connected to Redis")
-    except redis.ConnectionError:
-        logger.error("Failed to connect to Redis. Exiting...")
-        sys.exit(1)
+def get_terasim_states(host, port, simulationId):
+    url = f"http://{host}:{port}/simulation/{simulationId}/state"
+    response = requests.get(url)
+    return response.json()
