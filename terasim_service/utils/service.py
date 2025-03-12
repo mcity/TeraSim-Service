@@ -29,3 +29,8 @@ def get_terasim_states(host, port, simulationId):
     url = f"http://{host}:{port}/simulation/{simulationId}/state"
     response = requests.get(url)
     return response.json()
+
+def control_agent(host, port, simulationId, command):
+    url = f"http://{host}:{port}/simulation/{simulationId}/agent_command"
+    response = requests.post(url, json=command)
+    return response.json()

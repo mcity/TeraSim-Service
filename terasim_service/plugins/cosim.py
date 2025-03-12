@@ -204,9 +204,20 @@ class TeraSimCoSimPlugin(BasePlugin):
             simulation_state = SimulationState()
             simulation_state.simulation_time = traci.simulation.getTime()
 
-            # Get all agent IDs
-            vehicle_ids = traci.vehicle.getIDList()
-            vru_ids = traci.person.getIDList()
+            # Get all interested agent IDs
+            if "centered_agent_ID" in self.plugin_config:
+                centered_agent_ID = self.plugin_config["centered_agent_ID"]
+                agent_ids = traci.vehicle.getContextSubscriptionResults(centered_agent_ID).keys()
+                vehicle_ids = []
+                vru_ids = []
+                for _id in agent_ids:
+                    if "BV" in _id or "AV" in _id:
+                        vehicle_ids.append(_id)
+                    elif "VRU" in _id:
+                        vru_ids.append(_id)
+            else:
+                vehicle_ids = traci.vehicle.getIDList()
+                vru_ids = traci.person.getIDList()
             simulation_state.agent_count = {
                 "vehicle": len(vehicle_ids),
                 "vru": len(vru_ids),

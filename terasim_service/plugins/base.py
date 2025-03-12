@@ -39,6 +39,8 @@ class BasePlugin(ABC):
             "step": -100,
             "stop": -100,
         })
+        # Plugin configuration
+        self.plugin_config = plugin_config
         # Redis connection configuration
         self.redis_config = redis_config
         self.redis_client = None
