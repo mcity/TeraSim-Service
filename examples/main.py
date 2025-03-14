@@ -113,14 +113,14 @@ async def start_simulation(config: SimulationConfig):
     ```
     {
         "simulation_id": "550e8400-e29b-41d4-a716-446655440000",
-        "message": "Simulation started"
+        "message": "Simulation initializing"
     }
     ```
     """
     config_data = load_config(config.config_file)
     simulation_id = str(uuid.uuid4())
     running_simulations[simulation_id] = SimulationStatus(
-        id=simulation_id, status="started"
+        id=simulation_id, status="initializing"
     )
 
     # Start the simulation in a new process
@@ -130,7 +130,7 @@ async def start_simulation(config: SimulationConfig):
     )
     process.start()
 
-    return {"simulation_id": simulation_id, "message": "Simulation started"}
+    return {"simulation_id": simulation_id, "message": "Simulation initializing"}
 
 
 def get_simulation_id(simulation_id: str):

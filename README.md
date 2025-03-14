@@ -10,6 +10,16 @@ TeraSim Service provides a comprehensive HTTP API for managing simulation instan
 
 - Start new simulation instances
 - Check simulation status
+
+   The simulation will have the following statuses and their meanings are shown below:
+   | Simulation Status | Meaning                                                                 |
+   |-------------------|-------------------------------------------------------------------------|
+   | "initializing"         | The simulation has started for traffic flow initialization.             |
+   | "wait_for_tick"     | The traffic flow has been initialized and the simulation is waiting for the "tick" command. |
+   | "running"         | After receiving the "tick" command, the TeraSim simulation has started to advance for one step and it will take hundreds of milliseconds to finish the calculation. |
+   | "ticked"         | The TeraSim simulation has finished the one-step advance and it is waiting for the next "tick" command. |
+   | "finished"        | The TeraSim simulation has come to an end.                              |
+
 - Control simulations (pause, resume, stop)
 - Manually advance simulation steps (tick)
 - Retrieve simulation states

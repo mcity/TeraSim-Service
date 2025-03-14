@@ -102,7 +102,7 @@ class TeraSimCoSimPlugin(BasePlugin):
         return logger
 
     def on_start(self, simulator: Simulator, ctx):
-        """Connect to the Redis server and set the simulation status to be 'started'.
+        """Connect to the Redis server and set the simulation status to be 'initializing'.
 
         Args:
             simulator (Simulator): The simulator object.
@@ -357,7 +357,7 @@ class TeraSimCoSimPluginBefore(TeraSimCoSimPlugin):
             # Clear old data and set initial state with expiration
             self.redis_client.delete(f"simulation:{self.simulation_uuid}:*")
             self.redis_client.set(
-                f"simulation:{self.simulation_uuid}:status", "started", ex=self.key_expiry
+                f"simulation:{self.simulation_uuid}:status", "initializing", ex=self.key_expiry
             )
 
             self.logger.info(
@@ -458,7 +458,7 @@ class TeraSimCoSimPluginAfter(TeraSimCoSimPlugin):
 
             # Set initial state with expiration
             self.redis_client.set(
-                f"simulation:{self.simulation_uuid}:status", "initialized", ex=self.key_expiry
+                f"simulation:{self.simulation_uuid}:status", "wait_for_tick", ex=self.key_expiry
             )
 
             self.logger.info(
@@ -478,7 +478,7 @@ class TeraSimCoSimPluginAfter(TeraSimCoSimPlugin):
     
     def on_step(self, simulator, ctx):
         self.redis_client.set(
-            f"simulation:{self.simulation_uuid}:status", "stepped", ex=self.key_expiry
+            f"simulation:{self.simulation_uuid}:status", "ticked", ex=self.key_expiry
         )
         print("Simulation step finished!")
         return True

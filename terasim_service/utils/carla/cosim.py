@@ -56,7 +56,7 @@ class CarlaCosim(object):
         self.terasim = start_terasim(args.terasim_host, args.terasim_port, terasim_init_command)
         while True:
             terasim_status = get_terasim_status(args.terasim_host, args.terasim_port, self.terasim["simulation_id"])
-            if terasim_status.get("status", None) == "initialized":
+            if terasim_status.get("status", None) == "wait_for_tick":
                 break
             time.sleep(0.1)
 
@@ -78,7 +78,7 @@ class CarlaCosim(object):
             tick_terasim(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
             while True:
                 terasim_status = get_terasim_status(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
-                if terasim_status.get("status", None) == "stepped":
+                if terasim_status.get("status", None) == "ticked":
                     break
                 time.sleep(0.1)
             
