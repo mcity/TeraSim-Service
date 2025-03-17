@@ -1,4 +1,3 @@
-import json
 import logging
 from logging.handlers import RotatingFileHandler
 import redis
@@ -47,6 +46,7 @@ class TeraSimCoSimPlugin(BasePlugin):
         simulation_uuid: str,
         plugin_config: dict = DEFAULT_COSIM_PLUGIN_CONFIG,
         redis_config: dict = DEFAULT_REDIS_CONFIG,
+        base_dir: str = "output",
         key_expiry=3600,
         auto_run=False,
     ):
@@ -56,6 +56,7 @@ class TeraSimCoSimPlugin(BasePlugin):
             simulation_uuid (str): Unique identifier for the simulation instance.
             plugin_config (dict, optional): Configuration for the plugin. Defaults to DEFAULT_COSIM_PLUGIN_CONFIG.
             redis_config (dict, optional): Configuration for the Redis connection. Defaults to DEFAULT_REDIS_CONFIG.
+            base_dir (str, optional): Base directory for the log file. Defaults to "output".
             key_expiry (int, optional): Key expiration time in seconds. Defaults to 3600.
             auto_run (bool, optional): Flag to enable auto-run mode. Defaults to False.
         """
@@ -65,10 +66,13 @@ class TeraSimCoSimPlugin(BasePlugin):
         self.auto_run = auto_run
 
         # Setup logging
-        self.logger = self._setup_logger()
+        self.logger = self._setup_logger(base_dir)
 
-    def _setup_logger(self):
+    def _setup_logger(self, base_dir: str) -> logging.Logger:
         """Setup logger for the plugin.
+
+        Args:
+            base_dir (str): Base directory for the log file.
 
         Returns:
             logging.Logger: Logger instance for the plugin.
@@ -78,7 +82,7 @@ class TeraSimCoSimPlugin(BasePlugin):
 
         # Create a rotating file handler
         file_handler = RotatingFileHandler(
-            f"{self.plugin_name}_{self.simulation_uuid}.log",
+            f"{base_dir}/{self.plugin_name}.log",
             maxBytes=10 * 1024 * 1024,  # 10MB
             backupCount=5,
         )
@@ -346,8 +350,15 @@ class TeraSimCoSimPlugin(BasePlugin):
 
 
 class TeraSimCoSimPluginBefore(TeraSimCoSimPlugin):
-    def __init__(self, simulation_uuid, plugin_config = COSIM_PLUGIN_BEFORE_CONFIG, redis_config = DEFAULT_REDIS_CONFIG, key_expiry=3600, auto_run=False):
-        super().__init__(simulation_uuid, plugin_config, redis_config, key_expiry, auto_run)
+    def __init__(self, 
+        simulation_uuid, 
+        plugin_config = COSIM_PLUGIN_BEFORE_CONFIG, 
+        redis_config = DEFAULT_REDIS_CONFIG, 
+        base_dir = "output",
+        key_expiry=3600, 
+        auto_run=False
+    ):
+        super().__init__(simulation_uuid, plugin_config, redis_config, base_dir, key_expiry, auto_run)
 
     def on_start(self, simulator, ctx):
         try:
@@ -448,8 +459,14 @@ class TeraSimCoSimPluginBefore(TeraSimCoSimPlugin):
     
 
 class TeraSimCoSimPluginAfter(TeraSimCoSimPlugin):
-    def __init__(self, simulation_uuid, plugin_config = COSIM_PLUGIN_AFTER_CONFIG, redis_config = DEFAULT_REDIS_CONFIG, key_expiry=3600, auto_run=False):
-        super().__init__(simulation_uuid, plugin_config, redis_config, key_expiry, auto_run)
+    def __init__(self, 
+        simulation_uuid, 
+        plugin_config = COSIM_PLUGIN_AFTER_CONFIG, 
+        redis_config = DEFAULT_REDIS_CONFIG,
+        base_dir = "output",
+        key_expiry=3600, 
+        auto_run=False):
+        super().__init__(simulation_uuid, plugin_config, redis_config, base_dir, key_expiry, auto_run)
     
     def on_start(self, simulator, ctx):
         try:
