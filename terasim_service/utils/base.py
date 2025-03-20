@@ -85,6 +85,7 @@ def create_environment(config, base_dir):
         warmup_time_lb=config["environment"]["parameters"]["warmup_time_lb"],
         warmup_time_ub=config["environment"]["parameters"]["warmup_time_ub"],
         run_time=config["environment"]["parameters"]["run_time"],
+        configuration=env_params,
     )
 
 
