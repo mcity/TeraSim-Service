@@ -14,21 +14,6 @@ Content-Type: application/json
 ### Check simulation status
 GET http://localhost:8000/simulation_status/{{simulationId}}
 
-
-### Send a control command to the simulation to pause, only works when auto_run is false
-POST http://localhost:8000/simulation_control/{{simulationId}}
-Content-Type: application/json
-
-{"command":"pause"}
-
-### send a control command to continue the simulation to resume, only works when auto_run is false
-POST http://localhost:8000/simulation_control/{{simulationId}}
-Content-Type: application/json
-
-{
-    "command": "resume"
-}
-
 ### Stop the simulation
 POST http://localhost:8000/simulation_control/{{simulationId}}
 Content-Type: application/json

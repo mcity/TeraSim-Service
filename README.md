@@ -4,55 +4,25 @@ A HTTP service for TeraSim simulation control and monitoring, built with FastAPI
 
 ## Overview
 
-TeraSim Service provides a comprehensive HTTP API for managing simulation instances, enabling remote control and real-time monitoring capabilities.
-
-## Core Functionalities
-
+TeraSim Service provides a comprehensive HTTP API for managing simulation instances, enabling remote control and real-time monitoring capabilities. It offers the following core functionalities:
 - Start new simulation instances
 - Check simulation status
-
-   The simulation will have the following statuses and their meanings are shown below:
-   | Simulation Status | Meaning                                                                 |
-   |-------------------|-------------------------------------------------------------------------|
-   | "initializing"         | The simulation has started for traffic flow initialization.             |
-   | "wait_for_tick"     | The traffic flow has been initialized and the simulation is waiting for the "tick" command. |
-   | "running"         | After receiving the "tick" command, the TeraSim simulation has started to advance for one step and it will take hundreds of milliseconds to finish the calculation. |
-   | "ticked"         | The TeraSim simulation has finished the one-step advance and it is waiting for the next "tick" command. |
-   | "finished"        | The TeraSim simulation has come to an end.                              |
-
 - Control simulations (pause, resume, stop)
 - Manually advance simulation steps (tick)
 - Retrieve simulation states
 - Send commands to agents
 
-## API Endpoints
-
-```
-POST /start_simulation                    # Start a new simulation
-GET  /simulation_status/{sim_id}          # Check simulation status
-POST /simulation_control/{sim_id}         # Control simulation
-POST /simulation_tick/{sim_id}            # Advance simulation step
-GET  /simulation/{sim_id}/state           # Retrieve simulation states
-POST /simulation/{sim_id}/agent_command   # Send command to agent
-```
-
 ## Requirements
 
 - Python 3.9+
-- Redis server
 - TeraSim and its dependencies
 
 ## Setup
 
-1. Install TeraSim package:
-   ```bash
-   pip install terasim
-   ```
-
-2. Install Redis:
+1. Install Redis:
    For details, check [this link](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/install-redis-on-linux/)
 
-3. Start Redis server:
+2. Start Redis server:
    ```bash
    sudo systemctl enable redis-server
    sudo systemctl start redis-server
@@ -61,21 +31,164 @@ POST /simulation/{sim_id}/agent_command   # Send command to agent
    # Should return "PONG"
    ```
 
-4. Install TeraSim-Service package:
+3. Install TeraSim-Service package:
    ```bash
    poetry install
    ```
 
-5. Start the service:
-   ```bash
-   python examples/main.py
+## Usage
+To start the service, please run the following comand:
+```bash
+python examples/main.py
+```
+
+### Example REST API
+The following is an overview of the REST API requests used to interact with the TeraSim simulation service.
+
+1. **Start a Simulation**
+   
+   **Endpoint**: `POST /start_simulation`
+   
+   **Description**: Starts a new simulation with the specified configuration file.
+
+   **Request**:
+   ```
+   POST http://localhost:8000/start_simulation
+   Content-Type: application/json
+
+   {
+      "config_file": "examples/simulation_config.yaml", 
+      "auto_run": false
+   }
+   ```
+   Response:
+   - **200 OK**: Returns the `simulation_id` for the newly started simulation.
+   - Example:
+   ```
+   {
+      "simulation_id": "0fd93635-b2ea-4b17-818a-55cad6bb6691",
+      "message": "Simulation started"
+   }
    ```
 
-## API Documentation
+2. **Store Simulation ID**
+   
+   The `simulation_id` returned from the `start_simulation` request is stored in a variable for use in subsequent requests.
 
-Interactive API documentation available at:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+3. **Check Simulation Status**
+   
+   **Endpoint**: `GET /simulation_status/{simulationId}`
+   
+   **Description**: Retrieves the current status of the simulation.
+
+   **Request**:
+   ```
+   GET http://localhost:8000/simulation_status/{{simulationId}}
+   ```
+
+   **Response**:
+   - **200 OK**: Returns the current status of the simulation.
+   - **Example**:
+   ```
+   {
+      "id": "0fd93635-b2ea-4b17-818a-55cad6bb6691",
+      "status": "running",
+      "progress": 0.0
+   }
+   ```
+   The simulation will have the following statuses and their meanings are shown below:
+      | Simulation Status | Meaning                                                                 |
+      |-------------------|-------------------------------------------------------------------------|
+      | "initializing"         | The simulation has started for traffic flow initialization.             |
+      | "wait_for_tick"     | The traffic flow has been initialized and the simulation is waiting for the "tick" command. |
+      | "running"         | After receiving the "tick" command, the TeraSim simulation has started to advance for one step and it will take hundreds of milliseconds to finish the calculation. |
+      | "ticked"         | The TeraSim simulation has finished the one-step advance and it is waiting for the next "tick" command. |
+      | "finished"        | The TeraSim simulation has come to an end.                              |
+
+4. **Stop Simulation**
+
+   **Endpoint**: `POST /simulation_control/{simulationId}`
+
+   **Description**: Stops the simulation.
+
+   **Request**:
+   ```
+   POST http://localhost:8000/simulation_control/{{simulationId}}
+   Content-Type: application/json
+
+   {
+      "command": "stop"
+   }
+   ```
+
+5. **Tick the Simulation**
+   
+   **Endpoint**: `POST /simulation_tick/{simulationId}`
+   
+   **Description**: Advances the simulation by one step (only works when auto_run is false).
+
+   **Request**:
+   ```
+   POST http://localhost:8000/simulation_tick/{{simulationId}}
+   ```
+
+6. **Get Simulation States**
+   
+   **Endpoint**: `GET /simulation/{simulationId}/state`
+   
+   **Description**: Retrieves states of all interested agents inside the simulation.
+
+   **Request**:
+   ```
+   GET http://localhost:8000/simulation/{{simulationId}}/state
+   ```
+
+   **Response**:
+   - **200 OK**: Returns the current states of the simulation.
+   - **Example**: 
+   ```
+   {
+      "header": {"timestamp": [...], "information": [...]},
+      "simulation_time": [...],
+      "agent_count": {"vehicle": [...], "vru": [...]},
+      "agent_details": {
+         "vehicles": [...],
+         "vru": [...],
+      },
+      "traffic_light_details": [...],
+   }
+   ```
+
+7. **Control a Specific agent**
+
+   **Endpoint**: `POST /simulation/{simulationId}/agent_command`
+   
+   **Description**: Sends a control command to a specific agent in the simulation.
+
+   **Request**:
+   ```
+   POST http://localhost:8000/simulation/{{simulationId}}/agent_command
+   Content-Type: application/json
+
+   {
+      "agent_id": "CAV",
+      "agent_type": "vehicle",
+      "command_type": "set_state",
+      "data": {
+         "position": [112, 45.85],
+         "speed": 0.0
+      }
+   }
+   ```
+
+   **Response**:
+   - **200 OK**: Confirms that the command was successfully sent.
+   - **Example**:
+   ```
+   {
+      "message": "Agent command sent for agent CAV"
+   }
+   ```
 
 ## License
 

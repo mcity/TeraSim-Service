@@ -10,7 +10,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException
 from loguru import logger
 
 
-from terasim_service.plugins import TeraSimCoSimPluginBefore, TeraSimCoSimPluginAfter
+from terasim_service.plugins import TeraSimCoSimPluginBefore, TeraSimCoSimPluginAfter, COSIM_PLUGIN_BEFORE_CONFIG
 from terasim_service.utils import (
     check_redis_connection,
     create_environment,
@@ -59,6 +59,7 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
             / config["output"]["name"]
             / "raw_data"
             / config["output"]["nth"]
+            /simulation_id
         )
         base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -67,12 +68,19 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
         sim.bind_env(env)
 
         # Create and inject TeraSimControlPlugin
+        control_plugin_before_config = COSIM_PLUGIN_BEFORE_CONFIG
+        control_plugin_before_config["centered_agent_ID"] = "CAV"
         control_plugin_before = TeraSimCoSimPluginBefore(
-            simulation_uuid=simulation_id, auto_run=auto_run
+            simulation_uuid=simulation_id, 
+            plugin_config=control_plugin_before_config,
+            base_dir=str(base_dir),
+            auto_run=auto_run, 
         )
         control_plugin_before.inject(sim, {})
         control_plugin_after = TeraSimCoSimPluginAfter(
-            simulation_uuid=simulation_id, auto_run=auto_run
+            simulation_uuid=simulation_id, 
+            base_dir=str(base_dir),
+            auto_run=auto_run
         )
         control_plugin_after.inject(sim, {})
 
@@ -113,14 +121,14 @@ async def start_simulation(config: SimulationConfig):
     ```
     {
         "simulation_id": "550e8400-e29b-41d4-a716-446655440000",
-        "message": "Simulation initializing"
+        "message": "Simulation started"
     }
     ```
     """
     config_data = load_config(config.config_file)
     simulation_id = str(uuid.uuid4())
     running_simulations[simulation_id] = SimulationStatus(
-        id=simulation_id, status="initializing"
+        id=simulation_id, status="started"
     )
 
     # Start the simulation in a new process
@@ -130,7 +138,7 @@ async def start_simulation(config: SimulationConfig):
     )
     process.start()
 
-    return {"simulation_id": simulation_id, "message": "Simulation initializing"}
+    return {"simulation_id": simulation_id, "message": "Simulation started"}
 
 
 def get_simulation_id(simulation_id: str):

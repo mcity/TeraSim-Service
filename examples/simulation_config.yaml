@@ -31,6 +31,8 @@ environment:
     MOBIL_lc_flag: True
     stochastic_acc_flag: False
     sumo_net_file_path: "examples/maps/town10/town10.net.xml"
+    sumo_cfg_file_path: "examples/maps/town10/town10.sumocfg"
+    drive_rule: "righthand"
 
     adversity_cfg:
       vehicle:
@@ -147,6 +149,8 @@ environment:
 
     CAV_cfg:
       route: ['13', '14', '35', '24', '44', '17', '5', '6'] # list of SUMO edges (example for Carla Town10)
+      cache_radius: 150
+      control_radius: 50
 
 simulator:
   module: "terasim.simulator"
