@@ -152,12 +152,29 @@ The following is an overview of the REST API requests used to interact with the 
       "simulation_time": [...],
       "agent_count": {"vehicle": [...], "vru": [...]},
       "agent_details": {
-         "vehicles": [...],
+         "vehicle": {
+            "BV_bike_flow_5.23": {
+               "x": 58.01538972502436,
+               "y": 60.92,
+               "z": 0.0,
+               "orientation": 90.0, 
+               "length": 1.6,
+               "width": 0.65,
+               "height": 1.7,
+               "speed": 5.591859473845301,
+               "type": "DEFAULT_BIKETYPE"
+            },
+            ...
+         }
          "vru": [...],
       },
       "traffic_light_details": [...],
    }
    ```
+
+   **Note**:
+   - The `x`, `y`, and `z` coordinates of the agent are in the SUMO map coordinate system and represent the position of the agent's head center.
+   - The `orientation` of the agent is measured in degrees, ranging from 0 to 360. A value of 0 represents north, and the orientation increases clockwise.
 
 7. **Control a Specific agent**
 
