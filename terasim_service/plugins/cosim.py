@@ -233,7 +233,7 @@ class TeraSimCoSimPlugin(BasePlugin):
                 vehicle_state = AgentStateSimplified()
                 vehicle_state.x,vehicle_state.y,vehicle_state.z = traci.vehicle.getPosition3D(vid)
                 vehicle_state.lon,vehicle_state.lat = traci.simulation.convertGeo(vehicle_state.x, vehicle_state.y)
-                vehicle_state.orientation = traci.vehicle.getAngle(vid)
+                vehicle_state.sumo_angle = traci.vehicle.getAngle(vid)
                 vehicle_state.speed = traci.vehicle.getSpeed(vid)
                 vehicle_state.length = traci.vehicle.getLength(vid)
                 vehicle_state.width = traci.vehicle.getWidth(vid)
@@ -248,7 +248,7 @@ class TeraSimCoSimPlugin(BasePlugin):
             for vru_id in vru_ids:
                 vru_state = AgentStateSimplified()
                 vru_state.x, vru_state.y, vru_state.z = traci.person.getPosition3D(vru_id)
-                vru_state.orientation = traci.person.getAngle(vru_id)
+                vru_state.sumo_angle = traci.person.getAngle(vru_id)
                 vru_state.speed = traci.person.getSpeed(vru_id)
                 vru_state.length = traci.person.getLength(vru_id)
                 vru_state.width = traci.person.getWidth(vru_id)
@@ -292,22 +292,32 @@ class TeraSimCoSimPlugin(BasePlugin):
                     self.logger.error(f"Invalid agent type: {command.agent_type}")
                     return False
                 if command.command_type == "set_state":
+                    # Check that exactly one of position or lonlat is present
+                    has_position = "position" in command.data
+                    has_lonlat = "lonlat" in command.data
+                    if not (has_position ^ has_lonlat):  # XOR operation ensures exactly one is True
+                        self.logger.error("Must specify exactly one of position or lonlat")
+                        return False
                     if "position" in command.data:
                         x, y = command.data["position"]
-                        if command.agent_type == "vehicle":
-                            traci.vehicle.moveToXY(
-                                command.agent_id, "", 0, x, y, command.data.get("angle", 0), 2
-                            )
+                    elif "lonlat" in command.data:
+                        lon, lat = command.data["lonlat"]
+                        x, y = traci.simulation.convertGeo(lon, lat, fromGeo=True)
+                    if command.agent_type == "vehicle":
+                        traci.vehicle.moveToXY(
+                            command.agent_id, "", 0, x, y, command.data.get("sumo_angle", 0), 2
+                        )
 
-                            if "speed" in command.data:
-                                traci.vehicle.setSpeed(command.agent_id, command.data["speed"])
-                        else:
-                            traci.person.moveToXY(
-                                command.agent_id, "", x, y, command.data.get("angle", 0), 2
-                            )
+                        if "speed" in command.data:
+                            traci.vehicle.setSpeed(command.agent_id, command.data["speed"])
+                    else:
+                        traci.person.moveToXY(
+                            command.agent_id, "", x, y, command.data.get("sumo_angle", 0), 2
+                        )
 
-                            if "speed" in command.data:
-                                traci.person.setSpeed(command.agent_id, command.data["speed"])
+                        if "speed" in command.data:
+                            traci.person.setSpeed(command.agent_id, command.data["speed"])
+            
 
                 self.logger.info(f"Agent command executed: {command_data}")
                 return True

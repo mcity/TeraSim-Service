@@ -159,7 +159,7 @@ The following is an overview of the REST API requests used to interact with the 
                "z": 0.0,
                "lat": 0.0,
                "lon": 0.0,
-               "orientation": 90.0, 
+               "sumo_angle": 90.0, 
                "length": 1.6,
                "width": 0.65,
                "height": 1.7,
@@ -175,8 +175,8 @@ The following is an overview of the REST API requests used to interact with the 
    ```
 
    **Note**:
-   - The `x`, `y`, and `z` coordinates of the agent are in the SUMO map coordinate system and represent the position of the agent's head center.
-   - The `orientation` of the agent is measured in degrees, ranging from 0 to 360. A value of 0 represents north, and the orientation increases clockwise.
+   - The `x`, `y`, and `z` coordinates of the agent are in the SUMO map coordinate system and represent the position of the agent's front bumper center.
+   - The `sumo_angle` of the agent is measured in degrees, ranging from 0 to 360. A value of 0 represents north, and the sumo_angle increases clockwise.
 
 7. **Control a Specific agent**
 
@@ -195,10 +195,18 @@ The following is an overview of the REST API requests used to interact with the 
       "command_type": "set_state",
       "data": {
          "position": [112, 45.85],
+         "lonlat": [-96.21622, 29.759548],
+         
          "speed": 0.0
       }
    }
    ```
+   **Note**: 
+   - Either use `position` or `lonlat` in the data field, but not both at the same time
+   - `position` represents coordinates in the SUMO map coordinate system
+   - `lonlat` represents GPS coordinates in decimal degrees format (longitude, latitude)
+   - For vehicles, `position` or `lonlat` denotes the front bumper center of the vehicle
+   - `speed` is measured in meters per second (m/s)
 
    **Response**:
    - **200 OK**: Confirms that the command was successfully sent.

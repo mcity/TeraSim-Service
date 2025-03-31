@@ -16,7 +16,7 @@ class AgentStateSimplified(BaseModel):
     lat: float = 0.0
 
     # Orientation in the SUMO coordinate system
-    orientation: float = 0.0
+    sumo_angle: float = 0.0
 
     # Size (https://www.autoscout24.de/auto/technische-daten/mercedes-benz/vito/vito-111-cdi-kompakt-2003-2014-transporter-diesel/)
     ## length of the agent (meters)
