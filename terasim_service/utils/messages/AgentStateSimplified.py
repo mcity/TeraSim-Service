@@ -9,6 +9,11 @@ class AgentStateSimplified(BaseModel):
     y: float = 0.0
     ## elevation of the agent (meters)
     z: float = 0.0
+    
+    ## longitude of the agent (degrees)
+    lon: float = 0.0
+    ## latitude of the agent (degrees)
+    lat: float = 0.0
 
     # Orientation in the SUMO coordinate system
     orientation: float = 0.0

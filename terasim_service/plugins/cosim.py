@@ -232,6 +232,7 @@ class TeraSimCoSimPlugin(BasePlugin):
             for vid in vehicle_ids:
                 vehicle_state = AgentStateSimplified()
                 vehicle_state.x,vehicle_state.y,vehicle_state.z = traci.vehicle.getPosition3D(vid)
+                vehicle_state.lon,vehicle_state.lat = traci.simulation.convertGeo(vehicle_state.x, vehicle_state.y)
                 vehicle_state.orientation = traci.vehicle.getAngle(vid)
                 vehicle_state.speed = traci.vehicle.getSpeed(vid)
                 vehicle_state.length = traci.vehicle.getLength(vid)

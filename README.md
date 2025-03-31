@@ -157,6 +157,8 @@ The following is an overview of the REST API requests used to interact with the 
                "x": 58.01538972502436,
                "y": 60.92,
                "z": 0.0,
+               "lat": 0.0,
+               "lon": 0.0,
                "orientation": 90.0, 
                "length": 1.6,
                "width": 0.65,
