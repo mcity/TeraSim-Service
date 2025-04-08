@@ -892,6 +892,12 @@
         <phase duration="80" state="rGgrrGgr"/>
         <phase duration="3"  state="ryyrryyr"/>
         <phase duration="1"  state="rrrrrrrr"/>
+        <param key="linkSignalID:0" value="83"/>
+        <param key="linkSignalID:1" value="92"/>
+        <param key="linkSignalID:3" value="88"/>
+        <param key="linkSignalID:4" value="89"/>
+        <param key="linkSignalID:5" value="86"/>
+        <param key="linkSignalID:7" value="84"/>
     </tlLogic>
     <tlLogic id="NODE_12" type="static" programID="0" offset="0">
         <phase duration="15" state="GGgr"/>
@@ -900,6 +906,10 @@
         <phase duration="15" state="rrrG"/>
         <phase duration="3"  state="rrry"/>
         <phase duration="1"  state="rrrr"/>
+        <param key="linkSignalID:0" value="78"/>
+        <param key="linkSignalID:1" value="82"/>
+        <param key="linkSignalID:2" value="81"/>
+        <param key="linkSignalID:3" value="80"/>
     </tlLogic>
     <tlLogic id="NODE_17" type="static" programID="0" offset="0">
         <phase duration="15" state="rGrrrGrrr"/>
@@ -914,6 +924,14 @@
         <phase duration="26" state="rrGrrrGGr"/>
         <phase duration="3"  state="rryrrryyr"/>
         <phase duration="1"  state="rrrrrrrrr"/>
+        <param key="linkSignalID:0" value="61"/>
+        <param key="linkSignalID:1" value="62"/>
+        <param key="linkSignalID:2" value="67"/>
+        <param key="linkSignalID:3" value="68"/>
+        <param key="linkSignalID:4" value="65"/>
+        <param key="linkSignalID:5" value="66"/>
+        <param key="linkSignalID:7" value="63"/>
+        <param key="linkSignalID:8" value="64"/>
     </tlLogic>
     <tlLogic id="NODE_18" type="static" programID="0" offset="0">
         <phase duration="15" state="GgrrGgrr"/>
@@ -922,6 +940,12 @@
         <phase duration="15" state="rrGgrrGg"/>
         <phase duration="3"  state="rryyrryy"/>
         <phase duration="1"  state="rrrrrrrr"/>
+        <param key="linkSignalID:0" value="69"/>
+        <param key="linkSignalID:1" value="70"/>
+        <param key="linkSignalID:2" value="75"/>
+        <param key="linkSignalID:4" value="73"/>
+        <param key="linkSignalID:5" value="74"/>
+        <param key="linkSignalID:6" value="71"/>
     </tlLogic>
     <tlLogic id="NODE_23" type="static" programID="0" offset="0">
         <phase duration="15" state="GgrG"/>
@@ -930,6 +954,9 @@
         <phase duration="15" state="rrGr"/>
         <phase duration="3"  state="rryr"/>
         <phase duration="1"  state="rrrr"/>
+        <param key="linkSignalID:0" value="110"/>
+        <param key="linkSignalID:2" value="112"/>
+        <param key="linkSignalID:3" value="107"/>
     </tlLogic>
     <tlLogic id="NODE_24" type="static" programID="0" offset="0">
         <phase duration="25" state="GgrG"/>
@@ -938,6 +965,9 @@
         <phase duration="25" state="rrGr"/>
         <phase duration="3"  state="rryr"/>
         <phase duration="1"  state="rrrr"/>
+        <param key="linkSignalID:0" value="47"/>
+        <param key="linkSignalID:2" value="48"/>
+        <param key="linkSignalID:3" value="52"/>
     </tlLogic>
 
     <junction id="NODE_1" type="priority" x="135.0986312801168" y="-97.66217289534742" z="270.0028381347656" incLanes="EG_1_1_1_0 EG_1_1_1_1 EG_35_1_18_0" intLanes=":NODE_1_0_0 :NODE_1_0_1 :NODE_1_2_0" shape="139.52092588691042,-84.76809512520815,270.4424743652344 147.12566664127235,-84.8468907397522,270.4514465332031 140.03507841548617,-109.79916244325155,269.7779235839844 135.9243097919383,-112.65039847231046,269.5836486816406 129.4543500662265,-110.50499697922291,269.6243591308594 122.4036578580582,-110.5486617029312,269.55328369140625 116.61410512011854,-112.19279383676242,269.4379577636719 113.62613972584589,-108.1863936585227,269.5625915527344" customShape="1">
