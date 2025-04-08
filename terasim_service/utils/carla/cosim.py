@@ -5,16 +5,19 @@ import carla
 import random
 
 from .tools import (
+    carla_to_sumo,
     create_bike_blueprint,
     create_motor_blueprint,
     create_pedestrian_blueprint,
     create_vehicle_blueprint,
     destroy_all_actors,
+    draw_text,
     get_actor_id_from_attribute,
     sumo_to_carla,
     spawn_actor,
 )
 from ..service import (
+    control_agent,
     start_terasim,
     stop_terasim,
     tick_terasim,
@@ -22,15 +25,26 @@ from ..service import (
     get_terasim_states,
 )
 
+CAV_SUMO_ID = "CAV"
+
 
 class CarlaCosim(object):
     def __init__(self, args):
         self.args = args
 
         self.client = carla.Client(args.carla_host, args.carla_port)
-        self.client.set_timeout(2.0)
+        self.client.set_timeout(10.0)
 
         self.world = self.client.get_world()
+        if args.map_name:
+            print(f"Loading map {args.map_name}")
+            try:
+                self.world = self.client.load_world(args.map_name)
+            except:
+                print(f"Map {args.map_name} not found. Loading default map.")
+            self.world = self.client.load_world(args.map_name)
+        else:
+            print("No map name provided. Loading default map.")
 
         self.traffic_lights = self.world.get_actors().filter("traffic.traffic_light")
         for traffic_light in self.traffic_lights:
@@ -38,6 +52,8 @@ class CarlaCosim(object):
             traffic_light.freeze(True)
 
         self.control_cav = args.control_cav
+        self.initialize_cav = False
+        self.cav_shape = []
         self.async_mode = args.async_mode
         self.step_length = args.step_length
 
@@ -77,10 +93,15 @@ class CarlaCosim(object):
         else:
             tick_terasim(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
             while True:
-                terasim_status = get_terasim_status(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
-                if terasim_status.get("status", None) == "ticked":
+                terasim_status_http_response = get_terasim_status(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
+                terasim_status = terasim_status_http_response.get("status", None)
+                if terasim_status == "ticked":
                     break
-                time.sleep(0.1)
+                elif terasim_status is None:
+                    print("TeraSim status is None. Exiting...")
+                    return False
+                else:
+                    time.sleep(0.05)
             
             if self.control_cav:
                 self.sync_carla_cav_to_cosim()
@@ -88,17 +109,18 @@ class CarlaCosim(object):
             self.sync_cosim_actor_to_carla()
 
             self.world.tick()
+        return True
 
     def sync_carla_cav_to_cosim(self):
-        vehicle_status, carla_id = get_actor_id_from_attribute(self.world, "CAV")
+        vehicle_status, carla_id = get_actor_id_from_attribute(self.world, CAV_SUMO_ID)
 
         if not vehicle_status:
-            print("CAV not found in Carla simulation. Exiting...")
+            print("CAV not found in Carla simulation.")
             return
 
         CAV = self.world.get_actor(carla_id)
         transform = CAV.get_transform()
-        draw_text(self.world, transform.location + carla.Location(z=2.5), "CAV")
+        draw_text(self.world, transform.location + carla.Location(z=2.5), CAV_SUMO_ID)
         # draw_point(
         #     self.world,
         #     size=0.05,
@@ -110,36 +132,31 @@ class CarlaCosim(object):
         velocity = CAV.get_velocity()
         speed = (velocity.x**2 + velocity.y**2 + velocity.z**2) ** 0.5
 
-        cav_info = ActorDict()
-        cav_info.header.timestamp = time.time()
-
-        x = transform.location.x
-        y = transform.location.y
-
-        utm_x, utm_y = carla_to_utm(x, y)
-        height = get_z_offset(
-            world=self.world,
-            start_location=carla.Location(
-                transform.location.x, transform.location.y, 300
-            ),
-            end_location=carla.Location(
-                transform.location.x, transform.location.y, 200
-            ),
+        cav_sumo_location, cav_sumo_rotation = carla_to_sumo(
+            transform.location, 
+            transform.rotation, 
+            self.cav_shape, 
+            [0.0, 0.0, 0.0]
         )
 
-        cav_info.data["CAV"] = Actor(
-            x=utm_x,
-            y=utm_y,
-            z=height,
-            length=5.0,
-            width=1.8,
-            height=1.8,
-            orientation=math.radians(-transform.rotation.yaw),
-            speed_long=speed,
+        cav_command = {
+            "agent_id": CAV_SUMO_ID,
+            "agent_type": "vehicle",
+            "command_type": "set_state",
+            "data": {
+                "position": [cav_sumo_location[0], cav_sumo_location[1]],
+                "speed": speed,
+                "sumo_angle": cav_sumo_rotation[1],
+            }
+        }
+
+        control_agent(
+            self.args.terasim_host,
+            self.args.terasim_port,
+            self.terasim["simulation_id"],
+            cav_command,
         )
-
-        self.redis_client.set(CAV_INFO, cav_info)
-
+        
     def sync_cosim_tls_to_carla(self):
         try:
             cosim_tls_info = self.redis_client.get(TLS_INFO)
@@ -175,12 +192,24 @@ class CarlaCosim(object):
         terasim_states = get_terasim_states(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
 
         if not terasim_states:
-            print("terasim_states not available. Exiting...")
+            print("terasim_states not available.")
             return
 
         cosim_id_record = set()
 
         for veh_id in terasim_states["agent_details"]["vehicle"]:
+            if self.control_cav and veh_id == CAV_SUMO_ID:
+                if self.initialize_cav:
+                    continue
+                self.initialize_cav = True
+                self.cav_shape = [
+                    terasim_states["agent_details"]["vehicle"][veh_id]["length"],
+                    terasim_states["agent_details"]["vehicle"][veh_id]["width"],
+                    terasim_states["agent_details"]["vehicle"][veh_id]["height"],
+                ]
+                print("CAV is initialized based on SUMO state.")
+                print(terasim_states["agent_details"]["vehicle"][veh_id])
+
             self._process_vehicle(veh_id, terasim_states["agent_details"]["vehicle"][veh_id], cosim_id_record)
         
         for vru_id in terasim_states["agent_details"]["vru"]:
@@ -262,7 +291,7 @@ class CarlaCosim(object):
         cosim_id_record.add(veh_id)
 
         sumo_location = [veh_info["x"], veh_info["y"], veh_info["z"]]
-        sumo_rotation = [0.0, veh_info["orientation"], 0.0]
+        sumo_rotation = [0.0, veh_info["sumo_angle"], 0.0]
         shape = [veh_info["length"], veh_info["width"], veh_info["height"]]
 
         vehicle_status, carla_id = get_actor_id_from_attribute(self.world, veh_id)
@@ -353,5 +382,9 @@ class CarlaCosim(object):
         settings.synchronous_mode = False
         settings.fixed_delta_seconds = None
         self.world.apply_settings(settings)
-
+        
+        # destroy all actors in the world
         destroy_all_actors(self.world)
+
+        # stop TeraSim
+        stop_terasim(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])

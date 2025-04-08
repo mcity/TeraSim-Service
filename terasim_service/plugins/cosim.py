@@ -309,7 +309,7 @@ class TeraSimCoSimPlugin(BasePlugin):
                         )
 
                         if "speed" in command.data:
-                            traci.vehicle.setSpeed(command.agent_id, command.data["speed"])
+                            traci.vehicle.setPreviousSpeed(command.agent_id, command.data["speed"])
                     else:
                         traci.person.moveToXY(
                             command.agent_id, "", x, y, command.data.get("sumo_angle", 0), 2

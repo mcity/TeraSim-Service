@@ -25,10 +25,10 @@ def main():
         help='TCP port to listen to for Carla (default: 2000)')
     argparser.add_argument(
         '-s', '--step_length',
-        metavar='P',
-        default=0.04,
-        type=int,
-        help='TCP port to listen to (default: 2000)')
+        metavar='S',
+        default=0.1,
+        type=float,
+        help='Step length of Carla simulation in seconds (default: 0.1)')
     argparser.add_argument(
         '--control_cav',
         action='store_true',
@@ -37,6 +37,11 @@ def main():
         '--async_mode',
         action='store_true',
         help='Activate async mode execution')
+    argparser.add_argument(
+        '--map_name',
+        default='',
+        type=str,
+        help='Map name to load (default: empty string)')
     argparser.add_argument(
         '--terasim_host',
         default='localhost',
@@ -48,8 +53,8 @@ def main():
         help='TCP port to listen to for TeraSim (default: 8000)')
     argparser.add_argument(
         '--terasim_config',
-        default='examples/simulation_config.yaml',
-        help='Configuation file path for TeraSim (default: examples/simulation_config.yaml)')
+        default='examples/simulation_Mcity_carla_config.yaml',
+        help='Configuation file path for TeraSim (default: examples/simulation_Mcity_carla_config.yaml)')
     args = argparser.parse_args()
     carla_cosim = CarlaCosim(args)
 
@@ -61,8 +66,9 @@ def main():
     carla_cosim.world.set_weather(carla.WeatherParameters.WetSunset)
 
     try:
-        while True:
-            carla_cosim.tick()
+        tick_flag = True
+        while tick_flag:
+           tick_flag = carla_cosim.tick()
 
     except KeyboardInterrupt:
         print("Cancelled by user.")

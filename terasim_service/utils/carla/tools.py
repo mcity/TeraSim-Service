@@ -269,3 +269,24 @@ def sumo_to_carla(sumo_location, sumo_rotation, shape, offset):
     )
     carla_transform = carla.Transform(carla_location, carla_rotation)
     return carla_transform
+
+def carla_to_sumo(carla_location, carla_rotation, shape, offset):
+    # Carla location is [x,y,z], repsernting the head center of the agent
+    # Carla rotation is [pitch, yaw, roll]
+    # Shape is [length, width, height]
+    # Offset is [x, y, z]
+    # Convert Carla location to SUMO location
+    print(carla_location)
+    print(carla_rotation)
+    sumo_yaw = -1 * carla_rotation.yaw
+    sumo_location = [
+        carla_location.x + math.cos(math.radians(sumo_yaw)) * shape[0] / 2.0 - offset[0],
+        -carla_location.y + math.sin(math.radians(sumo_yaw)) * shape[0] / 2.0 - offset[1],
+        carla_location.z - offset[2],
+    ]
+    sumo_rotation = [
+        carla_rotation.pitch,
+        carla_rotation.yaw+90,
+        carla_rotation.roll,
+    ]
+    return sumo_location, sumo_rotation

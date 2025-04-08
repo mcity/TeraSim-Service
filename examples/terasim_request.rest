@@ -4,7 +4,7 @@ POST http://localhost:8000/start_simulation
 Content-Type: application/json
 
 {
-    "config_file": "examples/simulation_config.yaml",
+    "config_file": "examples/simulation_Mcity_config.yaml",
     "auto_run": false
 }
 
@@ -39,7 +39,7 @@ Content-Type: application/json
     "data": {
         "position": [112, 45.85],
         "speed": 0.0,
-        "angle": 225.0
+        "sumo_angle": 225.0
     }
 }
 
