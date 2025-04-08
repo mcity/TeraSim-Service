@@ -392,6 +392,11 @@ async def control_agents_batch(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
+
 if __name__ == "__main__":
     import uvicorn
 
