@@ -167,7 +167,6 @@ class CarlaCosim(object):
             return
 
         terasim_tls_data = terasim_states["traffic_light_details"]
-        print(terasim_tls_data)
 
         for node_id, node_info in terasim_tls_data.items():
             sumo_tls = node_info["tls"]
@@ -326,7 +325,6 @@ class CarlaCosim(object):
             sumo_offset = [0.0, 0.0, shape[2]] # spawn the vehicle higher than the ground to make sure it is available
             carla_trasform = sumo_to_carla(sumo_location, sumo_rotation, shape, sumo_offset)
             carla_id = spawn_actor(self.client, blueprint, carla_trasform)
-            print(f"Spawned vehicle in CARLA: SUMO ID {veh_id}, CARLA ID {carla_id}")
         else:
             sumo_offset = [0.0, 0.0, 0.0] # move the vehicle back to the ground
             carla_trasform = sumo_to_carla(sumo_location, sumo_rotation, shape, sumo_offset)
@@ -353,7 +351,6 @@ class CarlaCosim(object):
             sumo_offset = [0.0, 0.0, shape[2]] # spawn the VRU higher than the ground to make sure it is available
             carla_trasform = sumo_to_carla(sumo_location, sumo_rotation, shape, sumo_offset)
             carla_id = spawn_actor(self.client, blueprint, carla_trasform)
-            print(f"Spawned pedestrian in CARLA: SUMO ID {vru_id}, CARLA ID {carla_id}")
         else:
             # move the VRU back to the ground
             sumo_offset = [0.0, 0.0, shape[2]/2.0]
@@ -390,7 +387,6 @@ class CarlaCosim(object):
 
         for actor in actors_to_destroy:
             actor.destroy()
-            print(f"Destroyed {actor_type}: {actor.attributes.get('role_name')}")
 
     def close(self):
         """
