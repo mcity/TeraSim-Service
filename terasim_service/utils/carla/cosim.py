@@ -1,5 +1,5 @@
 import time
-import redis
+import json
 import math
 import carla
 import random
@@ -26,6 +26,7 @@ from ..service import (
 )
 
 CAV_SUMO_ID = "CAV"
+SUMO_CARLA_TLS_LINK_PREFIX = "linkSignalID:"
 
 
 class CarlaCosim(object):
@@ -42,7 +43,6 @@ class CarlaCosim(object):
                 self.world = self.client.load_world(args.map_name)
             except:
                 print(f"Map {args.map_name} not found. Loading default map.")
-            self.world = self.client.load_world(args.map_name)
         else:
             print("No map name provided. Loading default map.")
 
@@ -91,22 +91,24 @@ class CarlaCosim(object):
             if elapsed < self.step_length:
                 time.sleep(self.step_length - elapsed)
         else:
-            tick_terasim(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
             while True:
                 terasim_status_http_response = get_terasim_status(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
                 terasim_status = terasim_status_http_response.get("status", None)
-                if terasim_status == "ticked":
+                if terasim_status == "ticked" or terasim_status == "wait_for_tick":
                     break
                 elif terasim_status is None:
                     print("TeraSim status is None. Exiting...")
                     return False
                 else:
                     time.sleep(0.05)
-            
+
             if self.control_cav:
                 self.sync_carla_cav_to_cosim()
 
             self.sync_cosim_actor_to_carla()
+            self.sync_cosim_tls_to_carla()
+            
+            tick_terasim(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
 
             self.world.tick()
         return True
@@ -158,33 +160,50 @@ class CarlaCosim(object):
         )
         
     def sync_cosim_tls_to_carla(self):
-        try:
-            cosim_tls_info = self.redis_client.get(TLS_INFO)
-        except:
-            print("cosim_tls_info not available. Exiting...")
+        terasim_states = get_terasim_states(self.args.terasim_host, self.args.terasim_port, self.terasim["simulation_id"])
+
+        if not terasim_states:
+            print("terasim_states not available.")
             return
 
-        if cosim_tls_info:
-            cosim_tls_data = cosim_tls_info.data
+        terasim_tls_data = terasim_states["traffic_light_details"]
+        print(terasim_tls_data)
 
-            for node in cosim_tls_data:
-                node_tls = cosim_tls_data[node]
-                carla_tls_node = TLS_NODES[node]
+        for node_id, node_info in terasim_tls_data.items():
+            sumo_tls = node_info["tls"]
+            sumo_information = json.loads(node_info["information"])
+            parameters = None
+            for program_id, program in sumo_information["programs"].items():
+                try:
+                    parameters = program["parameters"]                
+                    break
+                except KeyError:
+                    print(f"KeyError: Node ({node_id}) Program ({program}) does not have 'parameters' key.")
+                    continue
+            if parameters is None:
+                print(f"Traffic Lights within Node ({node_id}) is not synchronized with Carla.")
+                continue
+            
+            for i in range(len(sumo_tls)):
+                param_key = f"{SUMO_CARLA_TLS_LINK_PREFIX}{i}"
+                carla_landmark_ids = parameters.get(param_key, "")
+                if carla_landmark_ids == "":
+                    continue
+                carla_landmark_ids = carla_landmark_ids.split(" ")
+                for landmark_id in carla_landmark_ids:
+                    light_id = int(landmark_id)
+                    light_actor = self.world.get_actor(light_id)
+                    if not light_actor:
+                        print(f"Traffic light with ID {light_id} not found in CARLA.")
+                        continue
 
-                for i in range(len(carla_tls_node)):
-                    light_ids = carla_tls_node[i]
-
-                    if light_ids:
-                        for light_id in light_ids:
-                            light_actor = self.world.get_actor(light_id)
-                            light_state = node_tls.tls[i]
-
-                            if light_state == "G" or light_state == "g":
-                                light_actor.set_state(carla.TrafficLightState.Green)
-                            elif light_state == "Y" or light_state == "y":
-                                light_actor.set_state(carla.TrafficLightState.Yellow)
-                            elif light_state == "R" or light_state == "r":
-                                light_actor.set_state(carla.TrafficLightState.Red)
+                    light_state = sumo_tls[i]
+                    if light_state == "G" or light_state == "g":
+                        light_actor.set_state(carla.TrafficLightState.Green)
+                    elif light_state == "Y" or light_state == "y":
+                        light_actor.set_state(carla.TrafficLightState.Yellow)
+                    elif light_state == "R" or light_state == "r":
+                        light_actor.set_state(carla.TrafficLightState.Red)
 
     def sync_cosim_actor_to_carla(self):
         """Update all actors in cosim to CARLA.

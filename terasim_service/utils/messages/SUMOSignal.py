@@ -10,3 +10,6 @@ class SUMOSignal(BaseModel):
 
     # traffic light status defined in SUMO
     tls: str = ""
+
+    # Other information
+    information: str = ""

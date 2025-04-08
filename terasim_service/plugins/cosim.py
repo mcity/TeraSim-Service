@@ -1,3 +1,4 @@
+import json
 import logging
 from logging.handlers import RotatingFileHandler
 import redis
@@ -67,6 +68,9 @@ class TeraSimCoSimPlugin(BasePlugin):
 
         # Setup logging
         self.logger = self._setup_logger(base_dir)
+
+        # Maintain controlled agents in each step, assuming each agent can be controlled by only one command
+        self.controlled_agents_each_step = set()
 
     def _setup_logger(self, base_dir: str) -> logging.Logger:
         """Setup logger for the plugin.
@@ -264,6 +268,18 @@ class TeraSimCoSimPlugin(BasePlugin):
                 sumo_signal = SUMOSignal()
                 sumo_signal.x, sumo_signal.y = 0,0
                 sumo_signal.tls = traci.trafficlight.getRedYellowGreenState(tl_id)
+                tls_information = {
+                    "programs": {}
+                }
+                tls = self.simulator.sumo_net.getTLS(tl_id)
+                programs = tls.getPrograms()
+                for program_id, program in programs.items():
+                    # Get the program parameters
+                    program_parameters = program.getParams()
+                    tls_information["programs"][program_id] = {
+                        "parameters": program_parameters
+                    }
+                sumo_signal.information = json.dumps(tls_information)
                 traffic_lights[tl_id] = sumo_signal
 
             simulation_state.traffic_light_details = traffic_lights
@@ -291,6 +307,10 @@ class TeraSimCoSimPlugin(BasePlugin):
                 if command.agent_type not in ["vehicle", "vru"]:
                     self.logger.error(f"Invalid agent type: {command.agent_type}")
                     return False
+                if command.agent_id in self.controlled_agents_each_step:
+                    self.logger.debug(f"Agent {command.agent_id} is already controlled")
+                    return True
+                self.controlled_agents_each_step.add(command.agent_id)
                 if command.command_type == "set_state":
                     # Check that exactly one of position or lonlat is present
                     has_position = "position" in command.data
@@ -414,6 +434,7 @@ class TeraSimCoSimPluginBefore(TeraSimCoSimPlugin):
                 return False
 
             # Handle all pending vehicle commands
+            self.controlled_agents_each_step.clear()
             self._handle_pending_agent_commands()
 
             # Write current simulation state
@@ -434,7 +455,7 @@ class TeraSimCoSimPluginBefore(TeraSimCoSimPlugin):
         self.redis_client.set(
             f"simulation:{self.simulation_uuid}:status", "running", ex=self.key_expiry
         )
-        print("Simulation step started")
+        self.logger.info("Simulation step started")
         return True
     
     def on_stop(self, simulator, ctx):
@@ -508,5 +529,5 @@ class TeraSimCoSimPluginAfter(TeraSimCoSimPlugin):
         self.redis_client.set(
             f"simulation:{self.simulation_uuid}:status", "ticked", ex=self.key_expiry
         )
-        print("Simulation step finished!")
+        self.logger.info("Simulation step finished!")
         return True
