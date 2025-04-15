@@ -226,6 +226,8 @@ class TeraSimCoSimPlugin(BasePlugin):
             else:
                 vehicle_ids = traci.vehicle.getIDList()
                 vru_ids = traci.person.getIDList()
+            # TODO: VRUs do not show up in the getContextSubscriptionResults, just use all VRUs at the current stage
+            vru_ids = traci.person.getIDList()
             simulation_state.agent_count = {
                 "vehicle": len(vehicle_ids),
                 "vru": len(vru_ids),
