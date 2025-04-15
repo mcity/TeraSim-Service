@@ -254,6 +254,7 @@ class TeraSimCoSimPlugin(BasePlugin):
             for vru_id in vru_ids:
                 vru_state = AgentStateSimplified()
                 vru_state.x, vru_state.y, vru_state.z = traci.person.getPosition3D(vru_id)
+                vru_state.lon, vru_state.lat = traci.simulation.convertGeo(vru_state.x, vru_state.y)
                 vru_state.sumo_angle = traci.person.getAngle(vru_id)
                 vru_state.speed = traci.person.getSpeed(vru_id)
                 vru_state.length = traci.person.getLength(vru_id)

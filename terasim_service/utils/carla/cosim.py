@@ -336,7 +336,7 @@ class CarlaCosim(object):
         cosim_id_record.add(vru_id)
 
         sumo_location = [vru_info["x"], vru_info["y"], vru_info["z"]]
-        sumo_rotation = [0.0, vru_info["orientation"], 0.0]
+        sumo_rotation = [0.0, vru_info["sumo_angle"], 0.0]
         shape = [vru_info["length"], vru_info["width"], vru_info["height"]]
 
         vru_status, carla_id = get_actor_id_from_attribute(self.world, vru_id)
@@ -362,7 +362,7 @@ class CarlaCosim(object):
 
         if carla_id > 0:
             if "BIKE" not in vru_info["type"]:
-                radians = math.radians(90 - vru_info["orientation"])
+                radians = math.radians(90 - vru_info["sumo_angle"])
                 orientation = math.atan2(math.sin(radians), math.cos(radians))
                 direction_x, direction_y = math.cos(orientation), math.sin(orientation)
                 walker_control = carla.WalkerControl(
