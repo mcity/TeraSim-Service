@@ -165,6 +165,10 @@ class CarlaCosim(object):
         if not terasim_states:
             print("terasim_states not available.")
             return
+        
+        if "traffic_light_details" not in terasim_states:
+            print("No traffic light details available.")
+            return
 
         terasim_tls_data = terasim_states["traffic_light_details"]
 
@@ -211,6 +215,18 @@ class CarlaCosim(object):
 
         if not terasim_states:
             print("terasim_states not available.")
+            return
+        
+        if "agent_details" not in terasim_states:
+            print("No agent details available.")
+            return
+        
+        if "vehicle" not in terasim_states["agent_details"]:
+            print("No vehicle details available.")
+            return
+        
+        if "vru" not in terasim_states["agent_details"]:
+            print("No VRU details available.")
             return
 
         cosim_id_record = set()
