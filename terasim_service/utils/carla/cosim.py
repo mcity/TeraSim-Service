@@ -7,6 +7,7 @@ import random
 from .tools import (
     carla_to_sumo,
     create_bike_blueprint,
+    create_bikeandmotor_blueprint,
     create_motor_blueprint,
     create_pedestrian_blueprint,
     create_vehicle_blueprint,
@@ -61,6 +62,7 @@ class CarlaCosim(object):
         self.motor_blueprints = create_motor_blueprint(self.world)
         self.pedestrian_blueprints = create_pedestrian_blueprint(self.world)
         self.bike_blueprints = create_bike_blueprint(self.world)
+        self.bikeandmotor_blueprints = create_bikeandmotor_blueprint(self.world)
 
         # self.sync_cosim_construction_zone_to_carla()
 
@@ -331,13 +333,17 @@ class CarlaCosim(object):
         vehicle_status, carla_id = get_actor_id_from_attribute(self.world, veh_id)
 
         if not vehicle_status:
-            blueprint = random.choice(
-                self.motor_blueprints
-                if "BIKE" in veh_info["type"]
-                else self.vehicle_blueprints
-            )
+            if "BIKE" in veh_info["type"]:
+                blueprint = random.choice(self.bike_blueprints)
+            elif "MOTOR" in veh_info["type"]:
+                blueprint = random.choice(self.motor_blueprints)
+            else:
+                blueprint = random.choice(self.vehicle_blueprints)
             blueprint.set_attribute("role_name", veh_id)
-            blueprint.set_attribute("color", "0, 102, 204")
+            if veh_id == CAV_SUMO_ID:
+                blueprint.set_attribute("color", "255, 0, 0")
+            else:
+                blueprint.set_attribute("color", "0, 102, 204")
             sumo_offset = [0.0, 0.0, shape[2]] # spawn the vehicle higher than the ground to make sure it is available
             carla_trasform = sumo_to_carla(sumo_location, sumo_rotation, shape, sumo_offset)
             carla_id = spawn_actor(self.client, blueprint, carla_trasform)
@@ -358,11 +364,12 @@ class CarlaCosim(object):
         vru_status, carla_id = get_actor_id_from_attribute(self.world, vru_id)
 
         if not vru_status:
-            blueprint = random.choice(
-                self.bike_blueprints
-                if "BIKE" in vru_info["type"]
-                else self.pedestrian_blueprints
-            )
+            if "BIKE" in vru_info["type"]:
+                blueprint = random.choice(self.bike_blueprints)
+            elif "MOTOR" in vru_info["type"]:
+                blueprint = random.choice(self.motor_blueprints)
+            else:
+                blueprint = random.choice(self.vehicle_blueprints)
             blueprint.set_attribute("role_name", vru_id)
             sumo_offset = [0.0, 0.0, shape[2]] # spawn the VRU higher than the ground to make sure it is available
             carla_trasform = sumo_to_carla(sumo_location, sumo_rotation, shape, sumo_offset)
@@ -387,10 +394,14 @@ class CarlaCosim(object):
                     ),
                     speed=vru_info["speed"],
                 )
-                self.world.get_actor(carla_id).apply_control(walker_control)
+                try:
+                    self.world.get_actor(carla_id).apply_control(walker_control)
+                except:
+                    pass
             else:
-                control = carla.VehicleControl()
-                self.world.get_actor(carla_id).apply_control(control)
+                # control = carla.VehicleControl()
+                # self.world.get_actor(carla_id).apply_control(control)
+                pass
 
     def _cleanup_actors(self, actor_type, pattern, cosim_id_record):
         """Clean up CARLA actors not in the cosim actor record."""

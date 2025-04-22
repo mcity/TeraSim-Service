@@ -87,6 +87,25 @@ def create_motor_blueprint(world):
     return motor_blueprints
 
 
+def create_bikeandmotor_blueprint(world):
+    blueprint_library = world.get_blueprint_library()
+    bikeandmotor_keywords = [
+        "vehicle.gazelle.omafiets",
+        "vehicle.diamondback.century",
+        "vehicle.bh.crossbike",
+        "vehicle.yamaha.yzf",
+        "vehicle.vespa.zx125",
+        "vehicle.kawasaki.ninja",
+        "vehicle.harley-davidson.low_rider",
+    ]
+    bikeandmotor_blueprints = [
+        bp
+        for bp in blueprint_library.filter("vehicle.*")
+        if any(keyword in bp.id for keyword in bikeandmotor_keywords)
+    ]
+    return bikeandmotor_blueprints
+
+
 def create_construction_zone_blueprint(world):
     blueprint_library = world.get_blueprint_library()
     construction_zone_blueprint = blueprint_library.find(
