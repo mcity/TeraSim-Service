@@ -114,6 +114,20 @@ def create_construction_zone_blueprint(world):
     return construction_zone_blueprint
 
 
+def create_police_car_blueprint(world):
+    blueprint_library = world.get_blueprint_library()
+    police_car_keywords = [
+        "vehicle.dodge.charger_police",
+        "vehicle.dodge.charger_police_2020",
+    ]
+    police_car_blueprints = [
+        bp
+        for bp in blueprint_library.filter("vehicle.*")
+        if any(keyword in bp.id for keyword in police_car_keywords)
+    ]
+    return police_car_blueprints
+
+
 def isVehicle(actorID):
     return "BV" in actorID or "CAV" in actorID or "POV" in actorID or "VUT" in actorID
 

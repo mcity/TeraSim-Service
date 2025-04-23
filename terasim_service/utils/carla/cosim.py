@@ -10,6 +10,7 @@ from .tools import (
     create_bikeandmotor_blueprint,
     create_motor_blueprint,
     create_pedestrian_blueprint,
+    create_police_car_blueprint,
     create_vehicle_blueprint,
     destroy_all_actors,
     draw_text,
@@ -61,6 +62,7 @@ class CarlaCosim(object):
         self.vehicle_blueprints = create_vehicle_blueprint(self.world)
         self.motor_blueprints = create_motor_blueprint(self.world)
         self.pedestrian_blueprints = create_pedestrian_blueprint(self.world)
+        self.police_car_blueprints = create_police_car_blueprint(self.world)
         self.bike_blueprints = create_bike_blueprint(self.world)
         self.bikeandmotor_blueprints = create_bikeandmotor_blueprint(self.world)
 
@@ -337,6 +339,8 @@ class CarlaCosim(object):
                 blueprint = random.choice(self.bike_blueprints)
             elif "MOTOR" in veh_info["type"]:
                 blueprint = random.choice(self.motor_blueprints)
+            elif "POLICE" in veh_info["type"]:
+                blueprint = random.choice(self.police_car_blueprints)
             else:
                 blueprint = random.choice(self.vehicle_blueprints)
             blueprint.set_attribute("role_name", veh_id)
@@ -369,7 +373,7 @@ class CarlaCosim(object):
             elif "MOTOR" in vru_info["type"]:
                 blueprint = random.choice(self.motor_blueprints)
             else:
-                blueprint = random.choice(self.vehicle_blueprints)
+                blueprint = random.choice(self.pedestrian_blueprints)
             blueprint.set_attribute("role_name", vru_id)
             sumo_offset = [0.0, 0.0, shape[2]] # spawn the VRU higher than the ground to make sure it is available
             carla_trasform = sumo_to_carla(sumo_location, sumo_rotation, shape, sumo_offset)
