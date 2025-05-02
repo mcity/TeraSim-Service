@@ -231,29 +231,37 @@ class TeraSimCoSimPlugin(BasePlugin):
         """
         try:
             if self.redis_client:
+                finish_string = f"Simulation {self.simulation_uuid} finished!"
                 # Set simulation end status briefly before cleanup
-                finish_reason = simulator.env.record.get("finish_reason", "")
-                if finish_reason == "collision":
-                    collider = simulator.env.record.get("collider", "")
-                    finish_status_string = f"Simulation {self.simulation_uuid} ended due to a collision caused by " + collider
-                else:
-                    finish_status_string = f"Simulation {self.simulation_uuid} ended normally"
+                results_dict = {
+                    "finish_reason": simulator.env.record.get("finish_reason",""),
+                    "collider": simulator.env.record.get("collider",""),
+                    "victim": simulator.env.record.get("victim",""),
+                }
+                results_str = json.dumps(results_dict)
                 self.redis_client.set(
                     f"simulation:{self.simulation_uuid}:status",
-                    finish_status_string,
+                    "finished",
                     ex=10,  # Keep status for 10 seconds only
+                )
+                self.redis_client.set(
+                    f"simulation:{self.simulation_uuid}:result",
+                    results_str,
+                    ex=1800,  # Keep status for 30 minutes
                 )
 
                 # Clean up all simulation related data, except status
                 keys_pattern = f"simulation:{self.simulation_uuid}:*"
                 status_key = f"simulation:{self.simulation_uuid}:status"
+                result_key = f"simulation:{self.simulation_uuid}:result"
                 for key in self.redis_client.scan_iter(match=keys_pattern):
-                    if key.decode() != status_key:
+                    if key.decode() != status_key and key.decode() != result_key:
+                        # Delete all keys except status and result
                         self.redis_client.delete(key)
 
                 # Close Redis connection
                 self.redis_client.close()
-                self.logger.info(finish_status_string)
+                self.logger.info(finish_string)
         except RedisError as e:
             self.logger.error(f"Error during Redis cleanup: {e}")
         except Exception as e:
