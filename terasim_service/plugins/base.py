@@ -59,7 +59,6 @@ class BasePlugin(ABC):
         simulator.step_pipeline.hook(f"{self.plugin_name}_step", self.on_step, priority=self.plugin_priority["step"])
         simulator.stop_pipeline.hook(f"{self.plugin_name}_stop", self.on_stop, priority=self.plugin_priority["stop"])
     
-    @abstractmethod
     def on_start(self, simulator: Simulator, ctx):
         """Called when the simulation starts.
 
@@ -69,7 +68,6 @@ class BasePlugin(ABC):
         """
         pass
 
-    @abstractmethod
     def on_step(self, simulator: Simulator, ctx):
         """Called at each simulation step.
 
@@ -79,7 +77,6 @@ class BasePlugin(ABC):
         """
         pass
 
-    @abstractmethod
     def on_stop(self, simulator: Simulator, ctx):
         """Called when the simulation stops.
 

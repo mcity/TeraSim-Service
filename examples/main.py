@@ -10,7 +10,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException
 from loguru import logger
 
 
-from terasim_service.plugins import TeraSimCoSimPluginBefore, TeraSimCoSimPluginAfter, COSIM_PLUGIN_BEFORE_CONFIG
+from terasim_service.plugins import DEFAULT_COSIM_PLUGIN_CONFIG, TeraSimCoSimPlugin
 from terasim_service.utils import (
     check_redis_connection,
     create_environment,
@@ -68,21 +68,16 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
         sim.bind_env(env)
 
         # Create and inject TeraSimControlPlugin
-        control_plugin_before_config = COSIM_PLUGIN_BEFORE_CONFIG
-        control_plugin_before_config["centered_agent_ID"] = "CAV"
-        control_plugin_before = TeraSimCoSimPluginBefore(
+        terasim_cosim_plugin_config = DEFAULT_COSIM_PLUGIN_CONFIG
+        terasim_cosim_plugin_config["centered_agent_ID"] = "CAV"
+        terasim_cosim_plugin = TeraSimCoSimPlugin(
             simulation_uuid=simulation_id, 
-            plugin_config=control_plugin_before_config,
+            plugin_config=terasim_cosim_plugin_config,
             base_dir=str(base_dir),
             auto_run=auto_run, 
         )
-        control_plugin_before.inject(sim, {})
-        control_plugin_after = TeraSimCoSimPluginAfter(
-            simulation_uuid=simulation_id, 
-            base_dir=str(base_dir),
-            auto_run=auto_run
-        )
-        control_plugin_after.inject(sim, {})
+        terasim_cosim_plugin.inject(sim, {})
+        
 
         # Run the simulation
         await asyncio.get_event_loop().run_in_executor(executor, sim.run)
