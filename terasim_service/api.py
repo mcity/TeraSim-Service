@@ -68,6 +68,34 @@ executor = ThreadPoolExecutor(
 running_simulations = {}
 
 @app.get(
+    "/simulation_result/{simulation_id}",
+    tags=["simulations"],
+    summary="Get simulation result",
+    responses={
+        200: {"description": "Simulation result retrieved successfully"},
+        404: {"description": "Simulation not found"},
+    },
+)
+async def get_simulation_result(simulation_id: str = Depends(get_simulation_id)):
+    """
+    Retrieve the result of a completed simulation.
+
+    Parameters:
+    - simulation_id: Unique identifier of the simulation
+
+    Returns:
+    - dict: A dictionary containing the simulation status and result (if available)
+    """
+    try:
+        redis_client = redis.Redis()
+        simulation_result = redis_client.get(f"simulation:{simulation_id}:result")
+        if not simulation_result:
+            raise HTTPException(status_code=404, detail="Simulation result not found")
+        return json.loads(simulation_result.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get(
     "/av_route/{simulation_id}",
     tags=["simulations"],
     summary="Get AV route in LatLon coordinates"

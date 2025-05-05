@@ -14,14 +14,6 @@ Content-Type: application/json
 ### Check simulation status
 GET http://localhost:8000/simulation_status/{{simulationId}}
 
-### Stop the simulation
-POST http://localhost:8000/simulation_control/{{simulationId}}
-Content-Type: application/json
-
-{
-    "command": "stop"
-}
-
 ### Tick the simulation (advance one step) only works when auto_run is false
 POST http://localhost:8000/simulation_tick/{{simulationId}}
 
@@ -43,3 +35,13 @@ Content-Type: application/json
     }
 }
 
+### Stop the simulation
+POST http://localhost:8000/simulation_control/{{simulationId}}
+Content-Type: application/json
+
+{
+    "command": "stop"
+}
+
+### Check simulation result
+GET http://localhost:8000/simulation_result/{{simulationId}}
