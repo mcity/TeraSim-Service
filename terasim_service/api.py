@@ -40,10 +40,33 @@ def get_map_metadata(config, simulation_id):
             logger.exception(f"Failed to set metadata: {e}")
     return True
 
+
+def get_simulation_id(simulation_id: str):
+    if simulation_id not in running_simulations:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+    return simulation_id
+
+
+def check_simulation_running(simulation_id: str, redis_client: redis.Redis) -> bool:
+    """Check if a simulation is still running in Redis
+
+    Returns:
+        bool: True if simulation is running, False if stopped or doesn't exist
+    """
+    status = redis_client.get(f"simulation:{simulation_id}:status")
+    return status is not None and status.decode("utf-8") != "finished"
+
+
+def run_simulation_process(simulation_id: str, config: dict, auto_run: bool):
+    # This function will run in a separate process
+    asyncio.run(run_simulation_task(simulation_id, config, auto_run))
+
+
 description = """
 TeraSim Control Service API allows you to manage and control TeraSim simulations.
 You can start new simulations, check their status, and control ongoing simulations.
 """
+
 
 tags_metadata = [
     {
@@ -52,6 +75,7 @@ tags_metadata = [
     },
 ]
 
+
 app = FastAPI(
     title="TeraSim Control Service",
     description=description,
@@ -59,13 +83,16 @@ app = FastAPI(
     openapi_tags=tags_metadata,
 )
 
+
 # Use a thread pool to limit the number of concurrent simulations
 executor = ThreadPoolExecutor(
     max_workers=1
 )  # Adjust max_workers based on your system's capacity
 
+
 # Store running simulation tasks
 running_simulations = {}
+
 
 @app.get(
     "/simulation_result/{simulation_id}",
@@ -94,6 +121,7 @@ async def get_simulation_result(simulation_id: str = Depends(get_simulation_id))
         return json.loads(simulation_result.decode("utf-8"))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get(
     "/av_route/{simulation_id}",
@@ -162,11 +190,6 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
         gc.collect()
 
 
-def run_simulation_process(simulation_id: str, config: dict, auto_run: bool):
-    # This function will run in a separate process
-    asyncio.run(run_simulation_task(simulation_id, config, auto_run))
-
-
 @app.post("/start_simulation", tags=["simulations"], summary="Start a new simulation")
 async def start_simulation(config: SimulationConfig):
     """
@@ -200,22 +223,6 @@ async def start_simulation(config: SimulationConfig):
     process.start()
 
     return {"simulation_id": simulation_id, "message": "Simulation started"}
-
-
-def get_simulation_id(simulation_id: str):
-    if simulation_id not in running_simulations:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-    return simulation_id
-
-
-def check_simulation_running(simulation_id: str, redis_client: redis.Redis) -> bool:
-    """Check if a simulation is still running in Redis
-
-    Returns:
-        bool: True if simulation is running, False if stopped or doesn't exist
-    """
-    status = redis_client.get(f"simulation:{simulation_id}:status")
-    return status is not None and status.decode("utf-8") != "finished"
 
 
 @app.get(
