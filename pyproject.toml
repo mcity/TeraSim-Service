@@ -28,6 +28,9 @@ bandit = "^1.7.7"
 safety = "^2.3.5"
 requests = "^2.31.0"
 
+[tool.poetry.scripts]
+terasim-service = "terasim_service.__main__:main"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

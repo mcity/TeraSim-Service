@@ -37,10 +37,34 @@ TeraSim Service provides a comprehensive HTTP API for managing simulation instan
    ```
 
 ## Usage
-To start the service, please run the following comand:
+
+There are several ways to start the TeraSim Service:
+
+### Method 1: Using the command-line tool
+
+After installation, you can use the provided command-line tool:
+
+```bash
+terasim-service
+```
+
+### Method 2: Using the Python module
+
+You can run the service as a Python module:
+
+```bash
+python -m terasim_service
+```
+
+### Method 3: Running the example
+
+You can also run the example file to start the service:
+
 ```bash
 python examples/main.py
 ```
+
+All of these methods will start the service on `http://localhost:8000` by default.
 
 ### Example REST API
 The following is an overview of the REST API requests used to interact with the TeraSim simulation service.
