@@ -23,6 +23,24 @@ from terasim_service.utils import (
     AgentCommandBatch,
 )
 
+
+def get_map_metadata(config, simulation_id):
+    """Get the metadata for the simulation. Store it in redis.
+    """
+    map_path = Path(config["file_paths"]["sumo_net_file"])
+    # the metadata.json is in the same directory as the sumo net file
+    metadata_path = map_path.parent / "metadata.json"
+    with open(metadata_path, "r") as file:
+        metadata = json.load(file)
+        av_route = metadata["av_route"]
+        try:
+            redis_client = redis.Redis()
+            redis_client.set(f"simulation:{simulation_id}:map_metadata", json.dumps(metadata))
+            redis_client.set(f"simulation:{simulation_id}:av_route", json.dumps(av_route))
+        except Exception as e:
+            logger.exception(f"Failed to set metadata: {e}")
+    return True
+
 description = """
 TeraSim Control Service API allows you to manage and control TeraSim simulations.
 You can start new simulations, check their status, and control ongoing simulations.
@@ -65,6 +83,7 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
 
         env = create_environment(config, base_dir)
         sim = create_simulator(config, base_dir)
+        get_map_metadata(config, simulation_id) # get the map metadata and store it in redis
         sim.bind_env(env)
 
         # Create and inject TeraSimControlPlugin
