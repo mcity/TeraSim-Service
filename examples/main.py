@@ -32,7 +32,7 @@ def get_map_metadata(config, simulation_id):
     metadata_path = map_path.parent / "metadata.json"
     with open(metadata_path, "r") as file:
         metadata = json.load(file)
-        av_route = metadata["av_route"]
+        av_route = metadata["av_route_sumo"]
         try:
             redis_client = redis.Redis()
             redis_client.set(f"simulation:{simulation_id}:map_metadata", json.dumps(metadata))
@@ -68,7 +68,24 @@ executor = ThreadPoolExecutor(
 # Store running simulation tasks
 running_simulations = {}
 
-
+@app.get(
+    "/av_route/{simulation_id}",
+    tags=["simulations"],
+    summary="Get AV route in LatLon coordinates"
+)
+async def get_av_route(simulation_id: str):
+    """
+    Get the AV route in LatLon coordinates for the specified simulation.
+    """
+    try:
+        redis_client = redis.Redis()
+        av_route = redis_client.get(f"simulation:{simulation_id}:av_route")
+        if not av_route:
+            raise HTTPException(status_code=404, detail="AV route not found")
+        
+        return json.loads(av_route.decode("utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
     try:
@@ -83,7 +100,10 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
 
         env = create_environment(config, base_dir)
         sim = create_simulator(config, base_dir)
-        get_map_metadata(config, simulation_id) # get the map metadata and store it in redis
+        try:
+            get_map_metadata(config, simulation_id) # get the map metadata and store it in redis
+        except Exception as e:
+            logger.info(f"Failed to get map metadata: {e}")
         sim.bind_env(env)
 
         # Create and inject TeraSimControlPlugin
