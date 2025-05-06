@@ -20,3 +20,6 @@ class SimulationState(BaseModel):
 
     # Details of the traffic lights, the key is the traffic light ID, and the value is the traffic light state
     traffic_light_details: Dict[str, SUMOSignal] = {}
+
+    # Details of the construction zones, the key is the construction zone lane ID, and the value is its shape
+    construction_zone_details: Dict[str, list[list[float]]] = {}

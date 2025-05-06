@@ -8,6 +8,8 @@ import time
 from terasim.overlay import traci
 from terasim.simulator import Simulator
 
+from terasim_nde_nade.adversity import ConstructionAdversity
+
 from .base import BasePlugin, DEFAULT_REDIS_CONFIG
 
 from ..utils import SimulationState, AgentStateSimplified, SUMOSignal, AgentCommand
@@ -431,6 +433,18 @@ class TeraSimCoSimPlugin(BasePlugin):
                 traffic_lights[tl_id] = sumo_signal
 
             simulation_state.traffic_light_details = traffic_lights
+
+            # Add construction zone shapes
+            construction_zones = {}
+            if simulator.env.static_adversity is not None and simulator.env.static_adversity.adversities is not None:
+                for adversity in simulator.env.static_adversity.adversities:
+                    if isinstance(adversity, ConstructionAdversity):
+                        lane_shape = traci.lane.getShape(adversity._lane_id)
+                        if lane_shape: # convert to list of lists
+                            lane_shape = [list(coord) for coord in lane_shape]
+                        construction_zones[adversity._lane_id] = lane_shape
+
+            simulation_state.construction_zone_details = construction_zones
             
             # Write to Redis with expiration
             self.redis_client.set(
