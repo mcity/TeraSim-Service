@@ -1,6 +1,7 @@
 import json
 import logging
 from logging.handlers import RotatingFileHandler
+import numpy as np
 import redis
 from redis.exceptions import RedisError
 import time
@@ -13,6 +14,34 @@ from terasim_nde_nade.adversity import ConstructionAdversity
 from .base import BasePlugin, DEFAULT_REDIS_CONFIG
 
 from ..utils import SimulationState, AgentStateSimplified, SUMOSignal, AgentCommand
+
+
+def interpolate_by_distance(points, step):
+    """
+    Interpolate a tuple of tuples so that the distance between each point is equal to 'step'.
+
+    Args:
+        points (tuple of tuple): Original shape, e.g., ((x1, y1), (x2, y2), ...)
+        step (float): Desired distance between points.
+
+    Returns:
+        list of list: Interpolated points as [[x, y], ...] with equal spacing.
+    """
+    points = np.array(points, dtype=np.float32)
+    # Compute distances between consecutive points
+    deltas = np.diff(points, axis=0)
+    seg_lengths = np.hypot(deltas[:, 0], deltas[:, 1])
+    cumulative = np.insert(np.cumsum(seg_lengths), 0, 0)
+    total_length = cumulative[-1]
+    if total_length == 0:
+        return [points[0].tolist()]
+    # Generate equally spaced distances
+    num_points = int(np.floor(total_length / step)) + 1
+    distances = np.linspace(0, total_length, num_points)
+    # Interpolate x and y separately
+    x_interp = np.interp(distances, cumulative, points[:, 0])
+    y_interp = np.interp(distances, cumulative, points[:, 1])
+    return [[float(x), float(y)] for x, y in zip(x_interp, y_interp)]
 
 
 DEFAULT_COSIM_PLUGIN_CONFIG = {
@@ -62,6 +91,9 @@ class TeraSimCoSimPlugin(BasePlugin):
 
         # Maintain controlled agents in each step, assuming each agent can be controlled by only one command
         self.controlled_agents_each_step = set()
+
+        # Cache construction zone shapes
+        self.construction_zone_shapes = None
 
     def _setup_logger(self, base_dir: str) -> logging.Logger:
         """Setup logger for the plugin.
@@ -435,16 +467,16 @@ class TeraSimCoSimPlugin(BasePlugin):
             simulation_state.traffic_light_details = traffic_lights
 
             # Add construction zone shapes
-            construction_zones = {}
-            if simulator.env.static_adversity is not None and simulator.env.static_adversity.adversities is not None:
+            if self.construction_zone_shapes is None and simulator.env.static_adversity is not None and simulator.env.static_adversity.adversities is not None:
+                self.construction_zone_shapes = {}
                 for adversity in simulator.env.static_adversity.adversities:
                     if isinstance(adversity, ConstructionAdversity):
                         lane_shape = traci.lane.getShape(adversity._lane_id)
                         if lane_shape: # convert to list of lists
-                            lane_shape = [list(coord) for coord in lane_shape]
-                        construction_zones[adversity._lane_id] = lane_shape
+                            lane_shape = interpolate_by_distance(lane_shape, 2.0)
+                        self.construction_zone_shapes[adversity._lane_id] = lane_shape
 
-            simulation_state.construction_zone_details = construction_zones
+            simulation_state.construction_zone_details = self.construction_zone_shapes
             
             # Write to Redis with expiration
             self.redis_client.set(
