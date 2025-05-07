@@ -44,6 +44,53 @@ def interpolate_by_distance(points, step):
     return [[float(x), float(y)] for x, y in zip(x_interp, y_interp)]
 
 
+def generate_construction_zone_shape(lane_shape, lane_width, direction):
+    """
+    Generate a construction zone shape based on the lane shape and lane width.
+    The first ten points of the lane_shape are offset laterally, with the offset
+    gradually changing from direction * lane_width/2 to -direction * lane_width/2.
+    The remaining points are offset by a constant -direction * lane_width/2.
+
+    Args:
+        lane_shape (list of list): The lane shape as a list of [x, y] points.
+        lane_width (float): The width of the lane.
+        direction (int): -1 for from left to right, 1 for from right to left.
+
+    Returns:
+        list of list: The offset lane shape.
+    """
+    n = min(10, len(lane_shape))
+    construction_zone_shape = []
+    for i, pt in enumerate(lane_shape):
+        pt = np.array(pt)
+        # Compute tangent direction
+        if i < len(lane_shape) - 1:
+            next_pt = np.array(lane_shape[i + 1])
+            dir_vec = next_pt - pt
+        else:
+            prev_pt = np.array(lane_shape[i - 1])
+            dir_vec = pt - prev_pt
+        norm = np.linalg.norm(dir_vec)
+        if norm == 0:
+            dir_vec = np.array([1.0, 0.0])
+        else:
+            dir_vec = dir_vec / norm
+        # Normal vector (perpendicular)
+        normal = np.array([-dir_vec[1], dir_vec[0]]) * direction * -1
+
+        # Compute offset
+        if i < n:
+            # Linear interpolation from +lane_width/2 to -lane_width/2
+            alpha = i / (n - 1) if n > 1 else 0
+            offset_val = (1 - alpha) * (lane_width / 2) + alpha * (-lane_width / 2)
+        else:
+            offset_val = - lane_width / 2
+
+        offset_pt = pt + normal * offset_val
+        construction_zone_shape.append(offset_pt.tolist())
+    return construction_zone_shape
+
+
 DEFAULT_COSIM_PLUGIN_CONFIG = {
     "name": "terasim_cosim_plugin",
     "priority": {
@@ -474,7 +521,19 @@ class TeraSimCoSimPlugin(BasePlugin):
                         lane_shape = traci.lane.getShape(adversity._lane_id)
                         if lane_shape: # convert to list of lists
                             lane_shape = interpolate_by_distance(lane_shape, 2.0)
-                        self.construction_zone_shapes[adversity._lane_id] = lane_shape
+                            lane_index = int(adversity._lane_id.split("_")[-1])
+                            edge_id = traci.lane.getEdgeID(adversity._lane_id)
+                            if lane_index == 0:
+                                # From right to left
+                                direction = 1
+                            elif lane_index == traci.edge.getLaneNumber(edge_id) - 1:
+                                # From left to right
+                                direction = -1
+                            else:
+                                # Middle lane, no construction zone
+                                continue
+                            construction_zone_shape = generate_construction_zone_shape(lane_shape, traci.lane.getWidth(adversity._lane_id), direction)
+                            self.construction_zone_shapes[adversity._lane_id] = construction_zone_shape
 
             simulation_state.construction_zone_details = self.construction_zone_shapes
             
