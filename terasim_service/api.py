@@ -54,7 +54,7 @@ def check_simulation_running(simulation_id: str, redis_client: redis.Redis) -> b
         bool: True if simulation is running, False if stopped or doesn't exist
     """
     status = redis_client.get(f"simulation:{simulation_id}:status")
-    return status is not None and status.decode("utf-8") != "finished"
+    return status is not None
 
 
 def run_simulation_process(simulation_id: str, config: dict, auto_run: bool):

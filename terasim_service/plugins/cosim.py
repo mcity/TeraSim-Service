@@ -323,7 +323,7 @@ class TeraSimCoSimPlugin(BasePlugin):
                 self.redis_client.set(
                     f"simulation:{self.simulation_uuid}:status",
                     "finished",
-                    ex=10,  # Keep status for 10 seconds only
+                    ex=1800,  # Keep status for 10 seconds only
                 )
                 self.redis_client.set(
                     f"simulation:{self.simulation_uuid}:result",
@@ -332,13 +332,13 @@ class TeraSimCoSimPlugin(BasePlugin):
                 )
 
                 # Clean up all simulation related data, except status
-                keys_pattern = f"simulation:{self.simulation_uuid}:*"
-                status_key = f"simulation:{self.simulation_uuid}:status"
-                result_key = f"simulation:{self.simulation_uuid}:result"
-                for key in self.redis_client.scan_iter(match=keys_pattern):
-                    if key.decode() != status_key and key.decode() != result_key:
-                        # Delete all keys except status and result
-                        self.redis_client.delete(key)
+                # keys_pattern = f"simulation:{self.simulation_uuid}:*"
+                # status_key = f"simulation:{self.simulation_uuid}:status"
+                # result_key = f"simulation:{self.simulation_uuid}:result"
+                # for key in self.redis_client.scan_iter(match=keys_pattern):
+                #     if key.decode() != status_key and key.decode() != result_key:
+                #         # Delete all keys except status and result
+                #         self.redis_client.delete(key)
 
                 # Close Redis connection
                 self.redis_client.close()
