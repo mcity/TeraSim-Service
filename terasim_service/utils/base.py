@@ -100,8 +100,8 @@ def create_simulator(config, base_dir):
         Simulator: The simulator object.
     """
     return Simulator(
-        sumo_net_file_path=Path(config["file_paths"]["sumo_net_file"]),
-        sumo_config_file_path=Path(config["file_paths"]["sumo_config_file"]),
+        sumo_net_file_path=Path(config["input"]["sumo_net_file"]),
+        sumo_config_file_path=Path(config["input"]["sumo_config_file"]),
         num_tries=config["simulator"]["parameters"]["num_tries"],
         gui_flag=config["simulator"]["parameters"]["gui_flag"],
         realtime_flag=config["simulator"]["parameters"].get("realtime_flag", False),

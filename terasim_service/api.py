@@ -26,7 +26,7 @@ from terasim_service.utils import (
 def get_map_metadata(config, simulation_id):
     """Get the metadata for the simulation. Store it in redis.
     """
-    map_path = Path(config["file_paths"]["sumo_net_file"])
+    map_path = Path(config["input"]["sumo_net_file"])
     # the metadata.json is in the same directory as the sumo net file
     metadata_path = map_path.parent / "metadata.json"
     with open(metadata_path, "r") as file:
