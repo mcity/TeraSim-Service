@@ -13,6 +13,7 @@ from .base import (
     SimulationCommand,
     SimulationStatus,
     AgentCommandBatch,
+    set_random_seed,
 )
 
 __all__ = [

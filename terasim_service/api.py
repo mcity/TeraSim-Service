@@ -20,6 +20,7 @@ from terasim_service.utils import (
     SimulationStatus,
     AgentCommand,
     AgentCommandBatch,
+    set_random_seed,
 )
 
 
@@ -153,6 +154,9 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
         )
         base_dir.mkdir(parents=True, exist_ok=True)
 
+        # set random seed
+        set_random_seed(config["seed"])
+        
         env = create_environment(config, base_dir)
         sim = create_simulator(config, base_dir)
         try:

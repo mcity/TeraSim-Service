@@ -109,8 +109,23 @@ def create_simulator(config, base_dir):
         sumo_output_file_types=config["simulator"]["parameters"][
             "sumo_output_file_types"
         ],
+        seed=config["simulator"]["parameters"].get("sumo_seed", None),
         additional_sumo_args=["--start", "--quit-on-end"],
     )
+
+def set_random_seed(seed):
+    """Set the random seed for the simulation.
+    """
+    import random
+    import numpy as np
+    random.seed(seed)
+    np.random.seed(seed)
+    try:
+        import torch
+        torch.manual_seed(seed)
+    except ImportError:
+        pass
+    logger.info(f"Setting random seed to {seed}")
 
 # Add this function to check Redis connection
 def check_redis_connection():
