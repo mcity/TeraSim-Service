@@ -129,7 +129,7 @@ def create_police_car_blueprint(world):
 
 
 def isVehicle(actorID):
-    return "BV" in actorID or "CAV" in actorID or "POV" in actorID or "VUT" in actorID
+    return "BV" in actorID or "AV" in actorID or "POV" in actorID or "VUT" in actorID
 
 
 def isPedestrian(actorID):

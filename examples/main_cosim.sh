@@ -9,4 +9,4 @@ python examples/main.py &
 sleep 30
 
 # Start the Carla server
-python examples/carla/main.py --terasim_config /app/examples/simulation_Mcity_carla_config.yaml --map_name=McityMap_Main --control_cav
+python examples/carla/main.py --terasim_config /app/examples/simulation_Mcity_carla_config.yaml --map_name=McityMap_Main --control_av

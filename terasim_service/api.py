@@ -167,7 +167,7 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
 
         # Create and inject TeraSimControlPlugin
         terasim_cosim_plugin_config = DEFAULT_COSIM_PLUGIN_CONFIG
-        terasim_cosim_plugin_config["centered_agent_ID"] = "CAV"
+        terasim_cosim_plugin_config["centered_agent_ID"] = "AV"
         terasim_cosim_plugin = TeraSimCoSimPlugin(
             simulation_uuid=simulation_id, 
             plugin_config=terasim_cosim_plugin_config,

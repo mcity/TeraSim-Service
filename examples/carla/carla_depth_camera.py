@@ -87,17 +87,17 @@ def main():
     client.set_timeout(2.0)
     world = client.get_world()
 
-    # Find the vehicle with the role_name "CAV"
-    CAV = None
-    while CAV is None:
+    # Find the vehicle with the role_name "AV"
+    AV = None
+    while AV is None:
         actor_list = world.get_actors().filter("vehicle.*")
         for x in actor_list:
-            if x.attributes.get("role_name") == "CAV":
-                CAV = x
-        print("CAV not found. Waiting for CAV to spawn...")
+            if x.attributes.get("role_name") == "AV":
+                AV = x
+        print("AV not found. Waiting for AV to spawn...")
         time.sleep(0.1)
 
-    print("Found CAV, attaching Depth camera...")
+    print("Found AV, attaching Depth camera...")
 
     sensor_manager = DepthSensorManager(
         world,
@@ -105,7 +105,7 @@ def main():
             carla.Location(x=0.5, y=0.0, z=1.5),
             carla.Rotation(roll=0.0, pitch=0.0, yaw=0.0),
         ),
-        CAV,
+        AV,
         {
             "image_size_x": "800",
             "image_size_y": "600",

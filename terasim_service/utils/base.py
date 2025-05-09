@@ -76,7 +76,7 @@ def create_environment(config, base_dir):
     env_params = OmegaConf.create(config["environment"]["parameters"])
 
     return env_class(
-        cav_cfg = env_params.CAV_cfg,
+        av_cfg = env_params.AV_cfg,
         vehicle_factory=NDEVehicleFactory(env_params),
         vru_factory=NDEVulnerableRoadUserFactory(env_params),
         info_extractor=InfoExtractor,

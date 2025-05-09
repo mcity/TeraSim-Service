@@ -48,7 +48,7 @@ POST http://localhost:8000/simulation/{{simulationId}}/vehicle_command
 Content-Type: application/json
 
 {
-    "vehicle_id": "CAV",
+    "vehicle_id": "AV",
     "type": "set_state",
     "position": [112, 45.85],
     "speed": 0.0,

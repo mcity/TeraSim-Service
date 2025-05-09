@@ -27,7 +27,7 @@ from ..service import (
     get_terasim_states,
 )
 
-CAV_SUMO_ID = "CAV"
+AV_SUMO_ID = "AV"
 SUMO_CARLA_TLS_LINK_PREFIX = "linkSignalID:"
 
 
@@ -53,9 +53,9 @@ class CarlaCosim(object):
             traffic_light.set_state(carla.TrafficLightState.Off)
             traffic_light.freeze(True)
 
-        self.control_cav = args.control_cav
-        self.initialize_cav = False
-        self.cav_shape = []
+        self.control_av = args.control_av
+        self.initialize_av = False
+        self.av_shape = []
         self.async_mode = args.async_mode
         self.step_length = args.step_length
 
@@ -83,8 +83,8 @@ class CarlaCosim(object):
     def tick(self):
         if self.async_mode:
             time_start = time.time()
-            if self.control_cav:
-                self.sync_carla_cav_to_cosim()
+            if self.control_av:
+                self.sync_carla_av_to_cosim()
 
             self.sync_cosim_actor_to_carla()
             self.sync_cosim_tls_to_carla()
@@ -106,8 +106,8 @@ class CarlaCosim(object):
                 else:
                     time.sleep(0.05)
 
-            if self.control_cav:
-                self.sync_carla_cav_to_cosim()
+            if self.control_av:
+                self.sync_carla_av_to_cosim()
 
             self.sync_cosim_actor_to_carla()
             self.sync_cosim_tls_to_carla()
@@ -117,16 +117,16 @@ class CarlaCosim(object):
             self.world.tick()
         return True
 
-    def sync_carla_cav_to_cosim(self):
-        vehicle_status, carla_id = get_actor_id_from_attribute(self.world, CAV_SUMO_ID)
+    def sync_carla_av_to_cosim(self):
+        vehicle_status, carla_id = get_actor_id_from_attribute(self.world, AV_SUMO_ID)
 
         if not vehicle_status:
-            print("CAV not found in Carla simulation.")
+            print("AV not found in Carla simulation.")
             return
 
-        CAV = self.world.get_actor(carla_id)
-        transform = CAV.get_transform()
-        draw_text(self.world, transform.location + carla.Location(z=2.5), CAV_SUMO_ID)
+        AV = self.world.get_actor(carla_id)
+        transform = AV.get_transform()
+        draw_text(self.world, transform.location + carla.Location(z=2.5), AV_SUMO_ID)
         # draw_point(
         #     self.world,
         #     size=0.05,
@@ -135,24 +135,24 @@ class CarlaCosim(object):
         #     life_time=0,
         # )
 
-        velocity = CAV.get_velocity()
+        velocity = AV.get_velocity()
         speed = (velocity.x**2 + velocity.y**2 + velocity.z**2) ** 0.5
 
-        cav_sumo_location, cav_sumo_rotation = carla_to_sumo(
+        av_sumo_location, av_sumo_rotation = carla_to_sumo(
             transform.location, 
             transform.rotation, 
-            self.cav_shape, 
+            self.av_shape, 
             [0.0, 0.0, 0.0]
         )
 
-        cav_command = {
-            "agent_id": CAV_SUMO_ID,
+        av_command = {
+            "agent_id": AV_SUMO_ID,
             "agent_type": "vehicle",
             "command_type": "set_state",
             "data": {
-                "position": [cav_sumo_location[0], cav_sumo_location[1]],
+                "position": [av_sumo_location[0], av_sumo_location[1]],
                 "speed": speed,
-                "sumo_angle": cav_sumo_rotation[1],
+                "sumo_angle": av_sumo_rotation[1],
             }
         }
 
@@ -160,7 +160,7 @@ class CarlaCosim(object):
             self.args.terasim_host,
             self.args.terasim_port,
             self.terasim["simulation_id"],
-            cav_command,
+            av_command,
         )
         
     def sync_cosim_tls_to_carla(self):
@@ -236,16 +236,16 @@ class CarlaCosim(object):
         cosim_id_record = set()
 
         for veh_id in terasim_states["agent_details"]["vehicle"]:
-            if self.control_cav and veh_id == CAV_SUMO_ID:
-                if self.initialize_cav:
+            if self.control_av and veh_id == AV_SUMO_ID:
+                if self.initialize_av:
                     continue
-                self.initialize_cav = True
-                self.cav_shape = [
+                self.initialize_av = True
+                self.av_shape = [
                     terasim_states["agent_details"]["vehicle"][veh_id]["length"],
                     terasim_states["agent_details"]["vehicle"][veh_id]["width"],
                     terasim_states["agent_details"]["vehicle"][veh_id]["height"],
                 ]
-                print("CAV is initialized based on SUMO state.")
+                print("AV is initialized based on SUMO state.")
                 print(terasim_states["agent_details"]["vehicle"][veh_id])
 
             self._process_vehicle(veh_id, terasim_states["agent_details"]["vehicle"][veh_id], cosim_id_record)
@@ -344,7 +344,7 @@ class CarlaCosim(object):
             else:
                 blueprint = random.choice(self.vehicle_blueprints)
             blueprint.set_attribute("role_name", veh_id)
-            if veh_id == CAV_SUMO_ID:
+            if veh_id == AV_SUMO_ID:
                 blueprint.set_attribute("color", "255, 0, 0")
             else:
                 blueprint.set_attribute("color", "0, 102, 204")
@@ -413,7 +413,7 @@ class CarlaCosim(object):
             actor
             for actor in self.world.get_actors().filter(pattern)
             if actor.attributes.get("role_name") not in cosim_id_record
-            and actor.attributes.get("role_name") != "CAV"
+            and actor.attributes.get("role_name") != "AV"
         ]
 
         for actor in actors_to_destroy:

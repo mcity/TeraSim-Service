@@ -80,17 +80,17 @@ def main():
     client.set_timeout(2.0)
     world = client.get_world()
 
-    # Find the vehicle with the role_name "CAV"
-    CAV = None
-    while CAV is None:
+    # Find the vehicle with the role_name "AV"
+    AV = None
+    while AV is None:
         actor_list = world.get_actors().filter("vehicle.*")
         for x in actor_list:
-            if x.attributes.get("role_name") == "CAV":
-                CAV = x
-        print("CAV not found. Waiting for CAV to spawn...")
+            if x.attributes.get("role_name") == "AV":
+                AV = x
+        print("AV not found. Waiting for AV to spawn...")
         time.sleep(0.1)
 
-    print("Found CAV, attaching RGB camera...")
+    print("Found AV, attaching RGB camera...")
 
     # Create and attach the RGB camera
     sensor_manager = SensorManager(
@@ -99,7 +99,7 @@ def main():
             carla.Location(x=-11.0, y=0.0, z=7.0),  # Adjust camera position
             carla.Rotation(roll=0.0, pitch=-25.0, yaw=0.0),  # Adjust camera rotation
         ),
-        CAV,
+        AV,
         {
             "image_size_x": "1920",
             "image_size_y": "1080",

@@ -4,7 +4,7 @@ ENVIRONMENT_VARIABLE_PORT = "TERASIM_REDIS_PORT"
 ENVIRONMENT_VARIABLE_PASSWORD = "TERASIM_REDIS_PASSWORD"
 
 # Redis channels or keys
-CAV_INFO = "cav_info"
+AV_INFO = "av_info"
 TLS_INFO = "tls_info"
 
 TERASIM_ACTOR_INFO = "terasim_actor_info"

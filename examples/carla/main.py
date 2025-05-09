@@ -30,9 +30,9 @@ def main():
         type=float,
         help='Step length of Carla simulation in seconds (default: 0.1)')
     argparser.add_argument(
-        '--control_cav',
+        '--control_av',
         action='store_true',
-        help='Activate CAV manual control mode execution')
+        help='Activate AV manual control mode execution')
     argparser.add_argument(
         '--async_mode',
         action='store_true',

@@ -8,7 +8,7 @@ parameters:
 simulation_type: "safetest_mcity_av"
 
 output:
-  dir: "output_cav"  # Output directory (use "output" for non-AV simulations)
+  dir: "output_av"  # Output directory (use "output" for non-AV simulations)
   name: "test"  # Experiment name
   nth: "0_0"  # Experiment number
   aggregated_dir: "aggregated"  # Directory for aggregated logs
@@ -147,7 +147,7 @@ environment:
           probability: 0.001
           predicted_collision_type: "intersection_stopcrossing"
 
-    CAV_cfg:
+    AV_cfg:
       route: ['13', '14', '35', '24', '44', '17', '5', '6'] # list of SUMO edges (example for Carla Town10)
       cache_radius: 150
       control_radius: 50

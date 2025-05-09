@@ -214,7 +214,7 @@ The following is an overview of the REST API requests used to interact with the 
    Content-Type: application/json
 
    {
-      "agent_id": "CAV",
+      "agent_id": "AV",
       "agent_type": "vehicle",
       "command_type": "set_state",
       "data": {
@@ -237,7 +237,7 @@ The following is an overview of the REST API requests used to interact with the 
    - **Example**:
    ```
    {
-      "message": "Agent command sent for agent CAV"
+      "message": "Agent command sent for agent AV"
    }
    ```
 

@@ -1,5 +1,5 @@
-# ignore output_cav folder and .log file
-output_cav
+# ignore output_av folder and .log file
+output_av
 *.log
 *.pyc
 

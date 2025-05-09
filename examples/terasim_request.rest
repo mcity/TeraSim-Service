@@ -25,7 +25,7 @@ POST http://localhost:8000/simulation/{{simulationId}}/agent_command
 Content-Type: application/json
 
 {
-    "agent_id": "CAV",
+    "agent_id": "AV",
     "agent_type": "vehicle",
     "command_type": "set_state",
     "data": {
