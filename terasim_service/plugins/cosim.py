@@ -142,6 +142,9 @@ class TeraSimCoSimPlugin(BasePlugin):
         # Cache construction zone shapes
         self.construction_zone_shapes = None
 
+        # Initialize last orientations cache
+        self.last_orientations = {}  # {vehicle_id: (last_orientation, last_time)}
+
     def _setup_logger(self, base_dir: str) -> logging.Logger:
         """Setup logger for the plugin.
 
@@ -466,11 +469,24 @@ class TeraSimCoSimPlugin(BasePlugin):
                 vehicle_state.x,vehicle_state.y,vehicle_state.z = traci.vehicle.getPosition3D(vid)
                 vehicle_state.lon,vehicle_state.lat = traci.simulation.convertGeo(vehicle_state.x, vehicle_state.y)
                 vehicle_state.sumo_angle = traci.vehicle.getAngle(vid)
+                vehicle_state.orientation = np.radians((90 - vehicle_state.sumo_angle) % 360)
                 vehicle_state.speed = traci.vehicle.getSpeed(vid)
+                vehicle_state.acceleration = traci.vehicle.getAcceleration(vid)
                 vehicle_state.length = traci.vehicle.getLength(vid)
                 vehicle_state.width = traci.vehicle.getWidth(vid)
                 vehicle_state.height = traci.vehicle.getHeight(vid)
                 vehicle_state.type = traci.vehicle.getTypeID(vid)
+                vehicle_state.angular_velocity = 0.0  # rad/s
+                now_time = simulation_state.simulation_time
+                now_orientation = vehicle_state.orientation
+                last_orientation, last_time = self.last_orientations.get(vid, (now_orientation, now_time))
+                dt = now_time - last_time
+                if dt > 0:
+                    dtheta = np.arctan2(np.sin(now_orientation - last_orientation), np.cos(now_orientation - last_orientation))
+                    vehicle_state.angular_velocity = dtheta / dt
+                else:
+                    vehicle_state.angular_velocity = 0.0
+                self.last_orientations[vid] = (now_orientation, now_time)
                 vehicles[vid] = vehicle_state
 
             simulation_state.agent_details["vehicle"] = vehicles
@@ -483,10 +499,12 @@ class TeraSimCoSimPlugin(BasePlugin):
                 vru_state.lon, vru_state.lat = traci.simulation.convertGeo(vru_state.x, vru_state.y)
                 vru_state.sumo_angle = traci.person.getAngle(vru_id)
                 vru_state.speed = traci.person.getSpeed(vru_id)
+                vru_state.acceleration = traci.person.getAcceleration(vru_id)
                 vru_state.length = traci.person.getLength(vru_id)
                 vru_state.width = traci.person.getWidth(vru_id)
                 vru_state.height = traci.person.getHeight(vru_id)
                 vru_state.type = traci.person.getTypeID(vru_id)
+                vru_state.angular_velocity = 0.0  # rad/s
                 vrus[vru_id] = vru_state
 
             simulation_state.agent_details["vru"] = vrus
