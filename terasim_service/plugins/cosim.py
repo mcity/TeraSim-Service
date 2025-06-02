@@ -505,6 +505,7 @@ class TeraSimCoSimPlugin(BasePlugin):
                 vru_state.height = traci.person.getHeight(vru_id)
                 vru_state.type = traci.person.getTypeID(vru_id)
                 vru_state.angular_velocity = 0.0  # rad/s
+                vru_state.orientation = np.radians((90 - vru_state.sumo_angle) % 360)
                 vrus[vru_id] = vru_state
 
             simulation_state.agent_details["vru"] = vrus

@@ -29,5 +29,10 @@ class AgentStateSimplified(BaseModel):
     # Speed
     speed: float = 0.0
 
+    # Orientation
+    orientation: float = 0.0
+    acceleration: float = 0.0
+    angular_velocity: float = 0.0
+
     # additional information of the agent
     type: str = ""
