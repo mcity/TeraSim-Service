@@ -4,10 +4,13 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process
 from pathlib import Path
+from typing import Annotated
 
 import redis
 from fastapi import Body, Depends, FastAPI, HTTPException
+from fastapi_mcp import FastApiMCP
 from loguru import logger
+from pydantic import Field
 
 from terasim_service.plugins import DEFAULT_COSIM_PLUGIN_CONFIG, TeraSimCoSimPlugin
 from terasim_service.utils import (
@@ -98,21 +101,30 @@ running_simulations = {}
 @app.get(
     "/simulation_result/{simulation_id}",
     tags=["simulations"],
-    summary="Get simulation result",
+    summary="Get detailed simulation result data",
     responses={
         200: {"description": "Simulation result retrieved successfully"},
         404: {"description": "Simulation not found"},
     },
 )
-async def get_simulation_result(simulation_id: str = Depends(get_simulation_id)):
+async def get_simulation_result(
+    simulation_id: Annotated[str, Field(description="UUID of simulation to get results from")] = Depends(get_simulation_id)
+):
     """
-    Retrieve the result of a completed simulation.
-
-    Parameters:
-    - simulation_id: Unique identifier of the simulation
-
+    Retrieve detailed result data from Redis for a completed simulation.
+    
+    Accesses simulation results stored in Redis during execution.
+    Provides structured access to key simulation outcomes and metrics.
+    
+    Args:
+        simulation_id: UUID of the target simulation
+        
     Returns:
-    - dict: A dictionary containing the simulation status and result (if available)
+        dict: Structured simulation result data from Redis storage
+        
+    Note:
+        This endpoint retrieves results cached in Redis during simulation execution.
+        For comprehensive file-based results, use get_simulation_results instead.
     """
     try:
         redis_client = redis.Redis()
@@ -127,11 +139,26 @@ async def get_simulation_result(simulation_id: str = Depends(get_simulation_id))
 @app.get(
     "/av_route/{simulation_id}",
     tags=["simulations"],
-    summary="Get AV route in LatLon coordinates"
+    summary="Get autonomous vehicle route coordinates"
 )
-async def get_av_route(simulation_id: str):
+async def get_av_route(
+    simulation_id: Annotated[str, Field(description="Simulation UUID to get AV route from")]
+):
     """
-    Get the AV route in LatLon coordinates for the specified simulation.
+    Retrieve the autonomous vehicle's planned route in geographic coordinates.
+    
+    Returns the complete AV route as latitude/longitude coordinate pairs.
+    Essential for understanding the AV's intended path and analyzing
+    scenario interactions along the route.
+    
+    Args:
+        simulation_id: UUID of simulation containing the AV route
+        
+    Returns:
+        list: Array of [latitude, longitude] coordinate pairs defining the AV route
+        
+    Example:
+        Returns route like: [[40.7128, -74.0060], [40.7140, -74.0070], ...]
     """
     try:
         redis_client = redis.Redis()
@@ -194,24 +221,31 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
         gc.collect()
 
 
-@app.post("/start_simulation", tags=["simulations"], summary="Start a new simulation")
-async def start_simulation(config: SimulationConfig):
+@app.post("/start_simulation", tags=["simulations"], summary="Start a new TeraSim simulation")
+async def start_simulation(
+    config: Annotated[SimulationConfig, Field(description="TeraSim simulation configuration including config file path and auto-run setting")]
+):
     """
-    Start a new simulation with the given configuration.
-
-    Parameters:
-    - config: SimulationConfig object containing the simulation configuration
-
+    Start a new TeraSim simulation with advanced scenario generation capabilities.
+    
+    This endpoint initializes a complete TeraSim simulation instance with support for:
+    - Multi-agent autonomous vehicle scenarios
+    - Real-time simulation control and monitoring
+    - Corner case and adversarial scenario testing
+    - Redis-based state management for distributed control
+    
+    Args:
+        config: SimulationConfig containing the YAML configuration file path and execution settings
+        
     Returns:
-    - dict: A dictionary containing the simulation_id and a status message
-
+        dict: Response containing unique simulation_id for tracking and control
+        
     Example:
-    ```
-    {
-        "simulation_id": "550e8400-e29b-41d4-a716-446655440000",
-        "message": "Simulation started"
-    }
-    ```
+        Start a highway merge scenario:
+        {
+            "config_file": "/path/to/highway_merge.yaml",
+            "auto_run": true
+        }
     """
     config_data = load_config(config.config_file)
     simulation_id = str(uuid.uuid4())
@@ -232,21 +266,33 @@ async def start_simulation(config: SimulationConfig):
 @app.get(
     "/simulation_status/{simulation_id}",
     tags=["simulations"],
-    summary="Get simulation status",
+    summary="Get real-time simulation status",
     responses={
         200: {"description": "Successful response", "model": SimulationStatus},
         404: {"description": "Simulation not found"},
     },
 )
-async def get_simulation_status(simulation_id: str = Depends(get_simulation_id)):
+async def get_simulation_status(
+    simulation_id: Annotated[str, Field(description="Unique simulation identifier returned from start_simulation")] = Depends(get_simulation_id)
+):
     """
-    Get the current status of a simulation.
-
-    Parameters:
-    - simulation_id: Unique identifier of the simulation
-
+    Retrieve real-time status information for an active TeraSim simulation.
+    
+    Provides comprehensive status monitoring including execution state, progress tracking,
+    and health information. Uses Redis backend for distributed state management.
+    
+    Args:
+        simulation_id: UUID string identifier for the target simulation instance
+        
     Returns:
-    - SimulationStatus: Object containing the current status of the simulation
+        SimulationStatus: Detailed status object with current execution state
+        
+    Status values:
+        - "started": Simulation initialized but not yet running
+        - "running": Active execution in progress
+        - "paused": Temporarily suspended, can be resumed
+        - "completed": Successfully finished execution
+        - "failed": Encountered error during execution
     """
     try:
         redis_client = redis.Redis()
@@ -263,7 +309,7 @@ async def get_simulation_status(simulation_id: str = Depends(get_simulation_id))
 @app.post(
     "/simulation_control/{simulation_id}",
     tags=["simulations"],
-    summary="Control a simulation",
+    summary="Control simulation execution",
     responses={
         200: {"description": "Command sent successfully"},
         404: {"description": "Simulation not found"},
@@ -271,18 +317,32 @@ async def get_simulation_status(simulation_id: str = Depends(get_simulation_id))
     },
 )
 async def control_simulation(
-    simulation_id: str = Depends(get_simulation_id),
-    command: SimulationCommand = Body(...),
+    command: Annotated[SimulationCommand, Field(description="Control command: pause, resume, or stop")],
+    simulation_id: Annotated[str, Field(description="Target simulation UUID")] = Depends(get_simulation_id),
 ):
     """
-    Send a control command to an ongoing simulation.
-
-    Parameters:
-    - simulation_id: Unique identifier of the simulation
-    - command: SimulationCommand object containing the control command
-
+    Send real-time control commands to manage simulation execution.
+    
+    Provides precise control over simulation lifecycle with immediate effect.
+    Commands are processed through Redis messaging for distributed control.
+    
+    Args:
+        simulation_id: UUID of the target simulation instance
+        command: Control operation to execute
+        
+    Available commands:
+        - pause: Temporarily suspend simulation execution
+        - resume: Continue paused simulation from current state
+        - stop: Terminate simulation and clean up resources
+        
     Returns:
-    - dict: A dictionary containing a message about the sent command
+        dict: Confirmation message with command execution status
+        
+    Example:
+        Pause a running simulation:
+        {
+            "command": "pause"
+        }
     """
     try:
         redis_client = redis.Redis()
@@ -308,22 +368,32 @@ async def control_simulation(
 @app.post(
     "/simulation_tick/{simulation_id}",
     tags=["simulations"],
-    summary="Advance simulation by one step",
+    summary="Single-step simulation execution",
     responses={
         200: {"description": "Tick command sent successfully"},
         404: {"description": "Simulation not found"},
         500: {"description": "Failed to send tick command"},
     },
 )
-async def tick_simulation(simulation_id: str = Depends(get_simulation_id)):
+async def tick_simulation(
+    simulation_id: Annotated[str, Field(description="UUID of simulation to advance")] = Depends(get_simulation_id)
+):
     """
-    Advance the simulation by one step. This only works when auto_run is false.
-
-    Parameters:
-    - simulation_id: Unique identifier of the simulation
-
+    Advance simulation by exactly one time step for precise control.
+    
+    Enables step-by-step debugging and detailed scenario analysis.
+    Only functions when simulation was started with auto_run=false.
+    Essential for detailed behavioral analysis and corner case investigation.
+    
+    Args:
+        simulation_id: UUID of the target simulation instance
+        
     Returns:
-    - dict: A dictionary containing a message about the sent tick command
+        dict: Confirmation that single step command was executed
+        
+    Note:
+        This command requires the simulation to be started with auto_run=false.
+        Use this for detailed step-by-step analysis of vehicle behaviors.
     """
     try:
         redis_client = redis.Redis()
@@ -343,21 +413,38 @@ async def tick_simulation(simulation_id: str = Depends(get_simulation_id)):
 @app.get(
     "/simulation_results/{simulation_id}",
     tags=["simulations"],
-    summary="Get simulation results",
+    summary="Get comprehensive simulation results",
     responses={
         200: {"description": "Simulation results retrieved successfully"},
         404: {"description": "Simulation not found"},
     },
 )
-async def get_simulation_results(simulation_id: str = Depends(get_simulation_id)):
+async def get_simulation_results(
+    simulation_id: Annotated[str, Field(description="UUID of completed simulation")] = Depends(get_simulation_id)
+):
     """
-    Retrieve the results of a completed simulation.
-
-    Parameters:
-    - simulation_id: Unique identifier of the simulation
-
+    Retrieve comprehensive results and analytics from completed simulation.
+    
+    Provides access to complete simulation output including vehicle trajectories,
+    collision data, performance metrics, and generated scenario files.
+    Results include both quantitative metrics and qualitative behavioral analysis.
+    
+    Args:
+        simulation_id: UUID of the simulation to retrieve results for
+        
     Returns:
-    - dict: A dictionary containing the simulation status and results (if available)
+        dict: Complete simulation results including:
+            - Execution status and completion state
+            - Vehicle trajectory data (FCD files)
+            - Collision detection results
+            - Performance metrics and KPIs
+            - Generated OpenSCENARIO files
+            - Output directory paths for detailed files
+            
+    Result states:
+        - running: Simulation still executing, partial results available
+        - completed: Full results available for analysis
+        - failed: Error occurred, diagnostic information provided
     """
     status = running_simulations[simulation_id].status
     if status == "running":
@@ -384,11 +471,28 @@ async def get_simulation_results(simulation_id: str = Depends(get_simulation_id)
 @app.get(
     "/simulation/{simulation_id}/state",
     tags=["simulations"],
-    summary="Get all simulation states",
+    summary="Get complete simulation state snapshot",
 )
-async def get_simulation_state(simulation_id: str = Depends(get_simulation_id)):
+async def get_simulation_state(
+    simulation_id: Annotated[str, Field(description="UUID of simulation to query state from")] = Depends(get_simulation_id)
+):
     """
-    Get the current state of the simulation.
+    Retrieve comprehensive real-time state information for active simulation.
+    
+    Provides complete snapshot of current simulation state including:
+    vehicle positions, speeds, accelerations, and behavioral states.
+    Essential for real-time monitoring and analysis.
+    
+    Args:
+        simulation_id: UUID of the target simulation
+        
+    Returns:
+        dict: Complete simulation state including:
+            - All vehicle states (position, velocity, acceleration)
+            - Traffic light states
+            - Environmental conditions
+            - Simulation time and step information
+            - Agent behavioral states
     """
     try:
         redis_client = redis.Redis()
@@ -409,13 +513,40 @@ async def get_simulation_state(simulation_id: str = Depends(get_simulation_id)):
 @app.post(
     "/simulation/{simulation_id}/agent_command",
     tags=["agents"],
-    summary="Send command to control an agent",
+    summary="Send real-time command to control specific agent",
 )
 async def control_vehicle(
-    simulation_id: str = Depends(get_simulation_id), command: AgentCommand = Body(...)
+    command: Annotated[AgentCommand, Field(description="Control command for specific agent (vehicle or pedestrian)")],
+    simulation_id: Annotated[str, Field(description="UUID of simulation containing the agent")] = Depends(get_simulation_id),
 ):
     """
-    Send a command to control a specific agent in the simulation.
+    Send real-time control commands to specific agents during simulation.
+    
+    Enables precise control over individual vehicle or pedestrian behavior
+    for testing specific scenarios and edge cases. Commands are queued
+    and executed in the next simulation step.
+    
+    Args:
+        simulation_id: UUID of the simulation containing the target agent
+        command: AgentCommand containing agent ID and control parameters
+        
+    Returns:
+        dict: Confirmation that command was queued for execution
+        
+    Command types:
+        - Lane change commands
+        - Speed control (acceleration/deceleration)
+        - Emergency braking
+        - Route modifications
+        - Behavioral parameter changes
+        
+    Example:
+        Force emergency braking for vehicle "car_1":
+        {
+            "agent_id": "car_1",
+            "command_type": "emergency_brake",
+            "parameters": {"deceleration": 8.0}
+        }
     """
     try:
         redis_client = redis.Redis()
@@ -425,7 +556,7 @@ async def control_vehicle(
             )
 
         redis_client.rpush(
-            f"simulation:{simulation_id}:agent_commands", json.dumps(command.dict())
+            f"simulation:{simulation_id}:agent_commands", json.dumps(command.model_dump())
         )
         return {"message": f"Agent command sent for agent {command.agent_id}"}
     except Exception as e:
@@ -435,15 +566,40 @@ async def control_vehicle(
 @app.post(
     "/simulation/{simulation_id}/agent_commands_batch",
     tags=["agents"],
-    summary="Send multiple commands to control agents",
+    summary="Send coordinated batch commands to multiple agents",
 )
 async def control_agents_batch(
-    simulation_id: str = Depends(get_simulation_id),
-    command_batch: AgentCommandBatch = Body(...),
+    command_batch: Annotated[AgentCommandBatch, Field(description="Collection of commands for multiple agents to execute simultaneously")],
+    simulation_id: Annotated[str, Field(description="UUID of simulation containing target agents")] = Depends(get_simulation_id),
 ):
     """
-    Send multiple commands to control different vehicles in the simulation.
-    Commands will be executed in the order they are provided.
+    Execute coordinated control commands across multiple agents simultaneously.
+    
+    Enables complex scenario orchestration by controlling multiple vehicles
+    and pedestrians in coordination. Commands are executed in the order provided
+    for precise timing control.
+    
+    Args:
+        simulation_id: UUID of simulation containing the target agents
+        command_batch: Collection of AgentCommand objects for batch execution
+        
+    Returns:
+        dict: Confirmation with count of commands successfully queued
+        
+    Use cases:
+        - Coordinated lane changes for convoy behavior
+        - Simultaneous emergency responses
+        - Traffic pattern manipulation
+        - Multi-agent corner case generation
+        
+    Example:
+        Coordinate emergency braking across multiple vehicles:
+        {
+            "commands": [
+                {"agent_id": "car_1", "command_type": "emergency_brake"},
+                {"agent_id": "car_2", "command_type": "lane_change", "target_lane": 2}
+            ]
+        }
     """
     try:
         redis_client = redis.Redis()
@@ -455,7 +611,7 @@ async def control_agents_batch(
         # Add all commands to the queue
         for command in command_batch.commands:
             redis_client.rpush(
-                f"simulation:{simulation_id}:agent_commands", json.dumps(command.dict())
+                f"simulation:{simulation_id}:agent_commands", json.dumps(command.model_dump())
             )
         return {
             "message": f"Batch of {len(command_batch.commands)} agent commands sent successfully"
@@ -469,8 +625,12 @@ def health_check():
     return {"status": "healthy"}
 
 
+# Add MCP support to the FastAPI application
+mcp = FastApiMCP(app)
+mcp.mount()
+
 def create_app():
-    """Create and return the FastAPI application."""
+    """Create and return the FastAPI application with MCP support."""
     # Check Redis connection
     check_redis_connection()
     return app 
