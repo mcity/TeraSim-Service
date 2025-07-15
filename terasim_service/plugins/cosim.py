@@ -429,6 +429,14 @@ class TeraSimCoSimPlugin(BasePlugin):
             simulator.running = False
         # Add more control command handling logic as needed
 
+    def get_vehicle_vru_ids(self):
+        """Get all vehicle and VRU IDs in the simulation."""
+        all_ids = list(set(traci.vehicle.getIDList() + traci.person.getIDList()))
+        # vehicle id is the id with BV/AV prefix, vru id is the id with VRU prefix
+        vehicle_ids = [id for id in all_ids if "BV" in id or "AV" in id]
+        vru_ids = [id for id in all_ids if "VRU" in id]
+        return vehicle_ids, vru_ids
+
     def _write_simulation_state(self, simulator):
         """Write the current simulation state to Redis.
 
@@ -442,21 +450,7 @@ class TeraSimCoSimPlugin(BasePlugin):
             simulation_state.simulation_time = traci.simulation.getTime()
 
             # Get all interested agent IDs
-            if "centered_agent_ID" in self.plugin_config:
-                centered_agent_ID = self.plugin_config["centered_agent_ID"]
-                agent_ids = traci.vehicle.getContextSubscriptionResults(centered_agent_ID).keys()
-                vehicle_ids = []
-                vru_ids = []
-                for _id in agent_ids:
-                    if "BV" in _id or "AV" in _id:
-                        vehicle_ids.append(_id)
-                    elif "VRU" in _id:
-                        vru_ids.append(_id)
-            else:
-                vehicle_ids = traci.vehicle.getIDList()
-                vru_ids = traci.person.getIDList()
-            # TODO: VRUs do not show up in the getContextSubscriptionResults, just use all VRUs at the current stage
-            vru_ids = traci.person.getIDList()
+            vehicle_ids, vru_ids = self.get_vehicle_vru_ids()
             simulation_state.agent_count = {
                 "vehicle": len(vehicle_ids),
                 "vru": len(vru_ids),
@@ -492,20 +486,56 @@ class TeraSimCoSimPlugin(BasePlugin):
             simulation_state.agent_details["vehicle"] = vehicles
 
             # Add VRU states
+            # Get current vehicle and person lists to determine actual object type
+            current_vehicle_list = traci.vehicle.getIDList()
+            current_person_list = traci.person.getIDList()
+            
             vrus = {}
             for vru_id in vru_ids:
                 vru_state = AgentStateSimplified()
-                vru_state.x, vru_state.y, vru_state.z = traci.person.getPosition3D(vru_id)
-                vru_state.lon, vru_state.lat = traci.simulation.convertGeo(vru_state.x, vru_state.y)
-                vru_state.sumo_angle = traci.person.getAngle(vru_id)
-                vru_state.speed = traci.person.getSpeed(vru_id)
-                vru_state.acceleration = traci.person.getAcceleration(vru_id)
-                vru_state.length = traci.person.getLength(vru_id)
-                vru_state.width = traci.person.getWidth(vru_id)
-                vru_state.height = traci.person.getHeight(vru_id)
-                vru_state.type = traci.person.getTypeID(vru_id)
-                vru_state.angular_velocity = 0.0  # rad/s
-                vru_state.orientation = np.radians((90 - vru_state.sumo_angle) % 360)
+                
+                # Determine if this VRU is actually a vehicle or person
+                if vru_id in current_vehicle_list:
+                    # VRU is actually a vehicle (disguised as pedestrian)
+                    vru_state.x, vru_state.y, vru_state.z = traci.vehicle.getPosition3D(vru_id)
+                    vru_state.lon, vru_state.lat = traci.simulation.convertGeo(vru_state.x, vru_state.y)
+                    vru_state.sumo_angle = traci.vehicle.getAngle(vru_id)
+                    vru_state.speed = traci.vehicle.getSpeed(vru_id)
+                    vru_state.acceleration = traci.vehicle.getAcceleration(vru_id)
+                    vru_state.length = traci.vehicle.getLength(vru_id)
+                    vru_state.width = traci.vehicle.getWidth(vru_id)
+                    vru_state.height = traci.vehicle.getHeight(vru_id)
+                    vru_state.type = traci.vehicle.getTypeID(vru_id)
+                    vru_state.angular_velocity = 0.0  # rad/s
+                    now_time = simulation_state.simulation_time
+                    now_orientation = np.radians((90 - vru_state.sumo_angle) % 360)
+                    last_orientation, last_time = self.last_orientations.get(vru_id, (now_orientation, now_time))
+                    dt = now_time - last_time
+                    if dt > 0:
+                        dtheta = np.arctan2(np.sin(now_orientation - last_orientation), np.cos(now_orientation - last_orientation))
+                        vru_state.angular_velocity = dtheta / dt
+                    else:
+                        vru_state.angular_velocity = 0.0
+                    self.last_orientations[vru_id] = (now_orientation, now_time)
+                    vru_state.orientation = now_orientation
+                elif vru_id in current_person_list:
+                    # VRU is actually a person
+                    vru_state.x, vru_state.y, vru_state.z = traci.person.getPosition3D(vru_id)
+                    vru_state.lon, vru_state.lat = traci.simulation.convertGeo(vru_state.x, vru_state.y)
+                    vru_state.sumo_angle = traci.person.getAngle(vru_id)
+                    vru_state.speed = traci.person.getSpeed(vru_id)
+                    vru_state.acceleration = traci.person.getAcceleration(vru_id)
+                    vru_state.length = traci.person.getLength(vru_id)
+                    vru_state.width = traci.person.getWidth(vru_id)
+                    vru_state.height = traci.person.getHeight(vru_id)
+                    vru_state.type = traci.person.getTypeID(vru_id)
+                    vru_state.angular_velocity = 0.0  # rad/s
+                    vru_state.orientation = np.radians((90 - vru_state.sumo_angle) % 360)
+                else:
+                    # VRU ID not found in either list, log warning and skip
+                    self.logger.warning(f"VRU ID {vru_id} not found in vehicle or person lists, skipping")
+                    continue
+                    
                 vrus[vru_id] = vru_state
 
             simulation_state.agent_details["vru"] = vrus
@@ -602,13 +632,28 @@ class TeraSimCoSimPlugin(BasePlugin):
 
                         if "speed" in command.data:
                             traci.vehicle.setPreviousSpeed(command.agent_id, command.data["speed"])
-                    else:
-                        traci.person.moveToXY(
-                            command.agent_id, "", x, y, command.data.get("sumo_angle", 0), 2
-                        )
-
-                        if "speed" in command.data:
-                            traci.person.setSpeed(command.agent_id, command.data["speed"])
+                    else:  # VRU type
+                        # Check if VRU is actually a vehicle or person
+                        current_vehicle_list = traci.vehicle.getIDList()
+                        current_person_list = traci.person.getIDList()
+                        
+                        if command.agent_id in current_vehicle_list:
+                            # VRU is actually a vehicle (disguised as pedestrian)
+                            traci.vehicle.moveToXY(
+                                command.agent_id, "", 0, x, y, command.data.get("sumo_angle", 0), 2
+                            )
+                            if "speed" in command.data:
+                                traci.vehicle.setPreviousSpeed(command.agent_id, command.data["speed"])
+                        elif command.agent_id in current_person_list:
+                            # VRU is actually a person
+                            traci.person.moveToXY(
+                                command.agent_id, "", x, y, command.data.get("sumo_angle", 0), 2
+                            )
+                            if "speed" in command.data:
+                                traci.person.setSpeed(command.agent_id, command.data["speed"])
+                        else:
+                            self.logger.error(f"VRU ID {command.agent_id} not found in vehicle or person lists")
+                            return False
             
 
                 self.logger.info(f"Agent command executed: {command_data}")
