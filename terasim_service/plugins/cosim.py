@@ -144,6 +144,10 @@ class TeraSimCoSimPlugin(BasePlugin):
 
         # Initialize last orientations cache
         self.last_orientations = {}  # {vehicle_id: (last_orientation, last_time)}
+        
+        # Initialize health monitoring
+        self.error_count = 0
+        self.last_successful_operation = time.time()
 
     def _setup_logger(self, base_dir: str) -> logging.Logger:
         """Setup logger for the plugin.
@@ -252,18 +256,30 @@ class TeraSimCoSimPlugin(BasePlugin):
         Returns:
             bool: True if the simulation step was successful, False otherwise.
         """
+        idle_start_time = time.time()
+        
         while True:
+            # Auto-stop if no commands for 10 minutes
+            if time.time() - idle_start_time > 600:  # 10 minutes
+                self.logger.warning("No activity for 10 minutes, auto-stopping")
+                return False
+                
             # Handle simulation control commands
             command = self._get_and_handle_command(simulator)
             if command == "stop":
                 return False
+
+            if command:
+                idle_start_time = time.time()  # Reset idle timer
 
             # Handle all pending vehicle commands
             self.controlled_agents_each_step.clear()
             self._handle_pending_agent_commands()
 
             # Write current simulation state
-            self._write_simulation_state(simulator)
+            state_write_success = self._write_simulation_state(simulator)
+            if not state_write_success:
+                return False
 
             if self._is_simulation_paused():
                 time.sleep(0.1)  # Wait while paused
@@ -444,7 +460,7 @@ class TeraSimCoSimPlugin(BasePlugin):
             simulator (Simulator): The simulator object.
         """
         if not self._check_simulation_status():
-            return
+            return False
         try:
             simulation_state = SimulationState()
             simulation_state.simulation_time = traci.simulation.getTime()
@@ -593,9 +609,51 @@ class TeraSimCoSimPlugin(BasePlugin):
             self.redis_client.expire(
                 f"simulation:{self.simulation_uuid}:state", self.key_expiry
             )
+            
+            # If we reach here, TeraSim is working normally
+            self.error_count = 0
+            self.last_successful_operation = time.time()
+            return True
 
         except Exception as e:
-            self.logger.error(f"Error writing simulation state: {e}")
+            self.error_count += 1
+            error_msg = str(e).lower()
+            
+            # Check if this is a critical error
+            critical_errors = [
+                "no network loaded",
+                "connection lost", 
+                "traci",
+                "sumo",
+                "simulation crashed"
+            ]
+            
+            is_critical = any(err in error_msg for err in critical_errors)
+            
+            self.logger.error(f"TeraSim error #{self.error_count}: {e}")
+            
+            # Stop if critical error or too many consecutive errors
+            if is_critical or self.error_count >= 3:
+                self.logger.critical(f"TeraSim appears broken, stopping simulation")
+                # Set error flag for cleanup task to handle
+                self.redis_client.set(
+                    f"simulation:{self.simulation_uuid}:error_stop", 
+                    f"terasim_error_{self.error_count}",
+                    ex=300  # 5 minutes expiry
+                )
+                return False
+                
+            # Also stop if no successful operation for too long
+            if time.time() - self.last_successful_operation > 300:  # 5 minutes
+                self.logger.critical("TeraSim not responding for 5 minutes, stopping")
+                self.redis_client.set(
+                    f"simulation:{self.simulation_uuid}:error_stop", 
+                    "terasim_timeout",
+                    ex=300
+                )
+                return False
+                
+            return True
 
     def _handle_agent_command(self, command_data):
         """Handle agent control commands.

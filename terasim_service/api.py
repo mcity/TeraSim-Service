@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Process
@@ -94,8 +95,8 @@ executor = ThreadPoolExecutor(
 )  # Adjust max_workers based on your system's capacity
 
 
-# Store running simulation tasks
-running_simulations = {}
+# Store running simulation tasks with process references
+running_simulations = {}  # {simulation_id: {"process": process, "start_time": time, "status": status}}
 
 
 @app.get(
@@ -207,13 +208,16 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
         # Run the simulation
         await asyncio.get_event_loop().run_in_executor(executor, sim.run)
 
-        running_simulations[simulation_id].status = "completed"
+        if simulation_id in running_simulations:
+            running_simulations[simulation_id]["status"] = "completed"
     except Exception as e:
         logger.exception(f"Simulation {simulation_id} failed: {str(e)}")
-        running_simulations[simulation_id].status = "failed"
+        if simulation_id in running_simulations:
+            running_simulations[simulation_id]["status"] = "failed"
     finally:
         # Remove the simulation from running_simulations
-        del running_simulations[simulation_id]
+        if simulation_id in running_simulations:
+            del running_simulations[simulation_id]
 
         # Force garbage collection
         import gc
@@ -249,9 +253,6 @@ async def start_simulation(
     """
     config_data = load_config(config.config_file)
     simulation_id = str(uuid.uuid4())
-    running_simulations[simulation_id] = SimulationStatus(
-        id=simulation_id, status="started"
-    )
 
     # Start the simulation in a new process
     process = Process(
@@ -259,6 +260,13 @@ async def start_simulation(
         args=(simulation_id, config_data, config.auto_run),
     )
     process.start()
+
+    # Store process reference and metadata
+    running_simulations[simulation_id] = {
+        "process": process,
+        "start_time": time.time(),
+        "status": "started"
+    }
 
     return {"simulation_id": simulation_id, "message": "Simulation started"}
 
@@ -300,8 +308,16 @@ async def get_simulation_status(
             raise HTTPException(
                 status_code=404, detail="Simulation not found or finished"
             )
-        running_simulations[simulation_id].status = redis_client.get(f"simulation:{simulation_id}:status").decode("utf-8")
-        return running_simulations[simulation_id]
+        redis_status = redis_client.get(f"simulation:{simulation_id}:status")
+        if redis_status:
+            running_simulations[simulation_id]["status"] = redis_status.decode("utf-8")
+        
+        # Return a SimulationStatus compatible response
+        return {
+            "id": simulation_id,
+            "status": running_simulations[simulation_id]["status"],
+            "progress": 0.0
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -446,7 +462,7 @@ async def get_simulation_results(
         - completed: Full results available for analysis
         - failed: Error occurred, diagnostic information provided
     """
-    status = running_simulations[simulation_id].status
+    status = running_simulations[simulation_id]["status"]
     if status == "running":
         return {
             "simulation_id": simulation_id,
@@ -623,6 +639,78 @@ async def control_agents_batch(
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+async def simple_cleanup_task():
+    """Check every minute and clean up problematic processes"""
+    while True:
+        await asyncio.sleep(60)  # Check every minute
+        
+        for sim_id, info in list(running_simulations.items()):
+            try:
+                # Check 1: Is the process dead?
+                if not info["process"].is_alive():
+                    logger.info(f"Process dead for simulation {sim_id}, cleaning up")
+                    del running_simulations[sim_id]
+                    continue
+                
+                # Check 2: Force terminate if running over 1 hour
+                runtime = time.time() - info["start_time"]
+                if runtime > 3600:  # 1 hour
+                    logger.warning(f"Simulation {sim_id} exceeded 1 hour runtime, terminating")
+                    terminate_simulation_process(sim_id, info)
+                    continue
+                    
+                # Check 3: Check for error flags in Redis
+                redis_client = redis.Redis()
+                error_flag = redis_client.get(f"simulation:{sim_id}:error_stop")
+                if error_flag:
+                    logger.warning(f"Error flag detected for {sim_id}, terminating")
+                    terminate_simulation_process(sim_id, info)
+                    continue
+                    
+            except Exception as e:
+                logger.error(f"Error in cleanup task for {sim_id}: {e}")
+
+
+def terminate_simulation_process(sim_id, info):
+    """Terminate the specified simulation process"""
+    try:
+        # Try graceful termination first
+        info["process"].terminate()
+        info["process"].join(timeout=5)
+        
+        # Force kill if still alive
+        if info["process"].is_alive():
+            info["process"].kill()
+            logger.warning(f"Force killed process for {sim_id}")
+        
+        # Clean up Redis data
+        redis_client = redis.Redis()
+        keys = redis_client.keys(f"simulation:{sim_id}:*")
+        if keys:
+            redis_client.delete(*keys)
+            
+    except Exception as e:
+        logger.error(f"Error terminating {sim_id}: {e}")
+    finally:
+        # Remove from memory
+        if sim_id in running_simulations:
+            del running_simulations[sim_id]
+
+
+@app.on_event("startup")
+async def startup_event():
+    # Start the cleanup task
+    asyncio.create_task(simple_cleanup_task())
+    logger.info("Simple cleanup task started")
+
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    # Clean up all processes when service shuts down
+    for sim_id, info in list(running_simulations.items()):
+        terminate_simulation_process(sim_id, info)
 
 
 # Add MCP support to the FastAPI application
