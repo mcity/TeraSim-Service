@@ -104,6 +104,7 @@ def create_simulator(config, base_dir):
         sumo_config_file_path=Path(config["input"]["sumo_config_file"]),
         num_tries=config["simulator"]["parameters"]["num_tries"],
         gui_flag=config["simulator"]["parameters"]["gui_flag"],
+        # gui_flag=True,
         realtime_flag=config["simulator"]["parameters"].get("realtime_flag", False),
         output_path=base_dir,
         sumo_output_file_types=config["simulator"]["parameters"][

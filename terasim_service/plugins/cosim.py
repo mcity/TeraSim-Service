@@ -433,8 +433,8 @@ class TeraSimCoSimPlugin(BasePlugin):
         """Get all vehicle and VRU IDs in the simulation."""
         all_ids = list(set(traci.vehicle.getIDList() + traci.person.getIDList()))
         # vehicle id is the id with BV/AV prefix, vru id is the id with VRU prefix
-        vehicle_ids = [id for id in all_ids if "BV" in id or "AV" in id]
         vru_ids = [id for id in all_ids if "VRU" in id]
+        vehicle_ids = [id for id in all_ids if id not in vru_ids]
         return vehicle_ids, vru_ids
 
     def _write_simulation_state(self, simulator):
