@@ -185,7 +185,38 @@ def create_map_traces(map_data, sim_state, display_options):
     """Create all map traces for the visualization."""
     traces = []
     
-    # Draw lanes
+    # Draw edge boundaries first (road outlines)
+    if map_data and "edges" in map_data:
+        for edge in map_data["edges"]:
+            # Draw left boundary
+            if edge["left_boundary"]:
+                x_coords = [pt[0] for pt in edge["left_boundary"]]
+                y_coords = [pt[1] for pt in edge["left_boundary"]]
+                traces.append(go.Scatter(
+                    x=x_coords,
+                    y=y_coords,
+                    mode='lines',
+                    line=dict(color='black', width=2),
+                    name=f'Edge {edge["id"]} left',
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+            
+            # Draw right boundary
+            if edge["right_boundary"]:
+                x_coords = [pt[0] for pt in edge["right_boundary"]]
+                y_coords = [pt[1] for pt in edge["right_boundary"]]
+                traces.append(go.Scatter(
+                    x=x_coords,
+                    y=y_coords,
+                    mode='lines',
+                    line=dict(color='black', width=2),
+                    name=f'Edge {edge["id"]} right',
+                    showlegend=False,
+                    hoverinfo='skip'
+                ))
+    
+    # Draw lanes (as thin center lines)
     if map_data and "lanes" in map_data:
         for lane in map_data["lanes"]:
             x_coords = [pt[0] for pt in lane["shape"]]
@@ -195,7 +226,7 @@ def create_map_traces(map_data, sim_state, display_options):
                 x=x_coords,
                 y=y_coords,
                 mode='lines',
-                line=dict(color='lightgray', width=lane["width"]*2),
+                line=dict(color='lightgray', width=1, dash='dot'),  # Thin dotted line
                 name=f'Lane {lane["id"]}',
                 showlegend=False,
                 hovertemplate=f'Lane: {lane["id"]}<br>Speed limit: {lane["speed_limit"]:.1f} m/s<extra></extra>'
@@ -219,49 +250,91 @@ def create_map_traces(map_data, sim_state, display_options):
                     hovertemplate=f'Junction: {junction["id"]}<extra></extra>'
                 ))
     
-    # Draw vehicles
+    # Draw vehicles with rotation
     if sim_state and "agent_details" in sim_state:
         vehicles = sim_state["agent_details"].get("vehicle", {})
         show_labels = 'labels' in display_options
         
         if vehicles:
-            # Separate vehicles by type
-            vehicle_types = {
-                'AV': {'x': [], 'y': [], 'text': [], 'hover': [], 'color': 'red'},
-                'BV': {'x': [], 'y': [], 'text': [], 'hover': [], 'color': 'blue'},
-                'Other': {'x': [], 'y': [], 'text': [], 'hover': [], 'color': 'green'}
-            }
-            
+            # Instead of grouping, draw each vehicle individually with rotation
             for vid, vdata in vehicles.items():
                 x, y = vdata["x"], vdata["y"]
                 text = vid if show_labels else ""
                 hover = f'{vid}<br>Speed: {vdata["speed"]:.1f} m/s<br>Type: {vdata["type"]}'
                 
+                # Determine vehicle color
                 if "AV" in vid:
+                    color = 'red'
                     vtype = 'AV'
                 elif "BV" in vid:
+                    color = 'blue'
                     vtype = 'BV'
                 else:
+                    color = 'green'
                     vtype = 'Other'
                 
-                vehicle_types[vtype]['x'].append(x)
-                vehicle_types[vtype]['y'].append(y)
-                vehicle_types[vtype]['text'].append(text)
-                vehicle_types[vtype]['hover'].append(hover)
-            
-            # Add vehicle traces
-            for vtype, vdata in vehicle_types.items():
-                if vdata['x']:
+                # Get vehicle angle (SUMO angle: 0=North, clockwise)
+                sumo_angle = vdata.get("sumo_angle", 0)
+                # Convert to mathematical angle (0=East, counter-clockwise)
+                # SUMO: 0=North, 90=East, 180=South, 270=West (clockwise)
+                # Math: 0=East, 90=North, 180=West, 270=South (counter-clockwise)
+                math_angle = (90 - sumo_angle) % 360
+                
+                # Create arrow-shaped vehicle using path
+                # Define vehicle shape (pointing right at 0 degrees)
+                length = vdata.get("length", 4.5)
+                width = vdata.get("width", 1.8)
+                
+                # Simple arrow shape
+                arrow_length = length * 0.8
+                arrow_width = width * 0.8
+                
+                # Calculate rotated arrow points
+                angle_rad = np.radians(math_angle)
+                cos_a = np.cos(angle_rad)
+                sin_a = np.sin(angle_rad)
+                
+                # Arrow points (relative to center)
+                points = [
+                    [arrow_length/2, 0],  # tip
+                    [-arrow_length/2, arrow_width/2],  # left back
+                    [-arrow_length/2, -arrow_width/2],  # right back
+                    [arrow_length/2, 0]  # close path
+                ]
+                
+                # Rotate and translate points
+                rotated_points = []
+                for px, py in points:
+                    rx = px * cos_a - py * sin_a + x
+                    ry = px * sin_a + py * cos_a + y
+                    rotated_points.append([rx, ry])
+                
+                # Draw vehicle as filled shape
+                x_coords = [p[0] for p in rotated_points]
+                y_coords = [p[1] for p in rotated_points]
+                
+                traces.append(go.Scatter(
+                    x=x_coords,
+                    y=y_coords,
+                    mode='lines',
+                    fill='toself',
+                    fillcolor=color,
+                    line=dict(color='darkgray', width=1),
+                    name=vid,
+                    showlegend=False,
+                    hovertemplate=hover
+                ))
+                
+                # Add label if needed
+                if show_labels:
                     traces.append(go.Scatter(
-                        x=vdata['x'],
-                        y=vdata['y'],
-                        mode='markers+text',
-                        marker=dict(size=10, color=vdata['color'], symbol='triangle-up'),
-                        text=vdata['text'],
+                        x=[x],
+                        y=[y],
+                        mode='text',
+                        text=[vid],
                         textposition="top center",
-                        name=vtype,
-                        hovertext=vdata['hover'],
-                        hovertemplate='%{hovertext}<extra></extra>'
+                        showlegend=False,
+                        hoverinfo='skip'
                     ))
         
         # Draw VRUs (pedestrians)

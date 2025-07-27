@@ -796,6 +796,7 @@ class TeraSimCoSimPlugin(BasePlugin):
         """Extract static map geometry from SUMO network."""
         map_data = {
             "lanes": [],
+            "edges": [],  # Add edges for boundary calculation
             "junctions": [],
             "traffic_lights": [],
             "bounds": {
@@ -828,6 +829,74 @@ class TeraSimCoSimPlugin(BasePlugin):
                         "length": float(lane.getLength()),
                         "edge_id": edge.getID()
                     })
+        
+        # Calculate edge boundaries
+        edges_dict = {}
+        for lane_data in map_data["lanes"]:
+            edge_id = lane_data["edge_id"]
+            if edge_id not in edges_dict:
+                edges_dict[edge_id] = []
+            edges_dict[edge_id].append(lane_data)
+        
+        # For each edge, calculate left and right boundaries
+        for edge_id, lanes in edges_dict.items():
+            if not lanes:
+                continue
+            
+            # Sort lanes by their index (assuming lane IDs end with _0, _1, etc.)
+            lanes.sort(key=lambda l: int(l["id"].split("_")[-1]))
+            
+            # Get leftmost and rightmost lanes
+            leftmost = lanes[0]
+            rightmost = lanes[-1]
+            
+            # Calculate boundaries
+            left_boundary = []
+            right_boundary = []
+            
+            # For leftmost lane, calculate left boundary
+            for i, point in enumerate(leftmost["shape"]):
+                if i < len(leftmost["shape"]) - 1:
+                    # Calculate perpendicular vector
+                    dx = leftmost["shape"][i+1][0] - point[0]
+                    dy = leftmost["shape"][i+1][1] - point[1]
+                    length = (dx**2 + dy**2)**0.5
+                    if length > 0:
+                        # Perpendicular vector pointing left
+                        perp_x = -dy / length
+                        perp_y = dx / length
+                        # Offset by half lane width
+                        offset = leftmost["width"] / 2
+                        left_boundary.append([
+                            point[0] + perp_x * offset,
+                            point[1] + perp_y * offset
+                        ])
+            
+            # For rightmost lane, calculate right boundary
+            for i, point in enumerate(rightmost["shape"]):
+                if i < len(rightmost["shape"]) - 1:
+                    # Calculate perpendicular vector
+                    dx = rightmost["shape"][i+1][0] - point[0]
+                    dy = rightmost["shape"][i+1][1] - point[1]
+                    length = (dx**2 + dy**2)**0.5
+                    if length > 0:
+                        # Perpendicular vector pointing right
+                        perp_x = dy / length
+                        perp_y = -dx / length
+                        # Offset by half lane width
+                        offset = rightmost["width"] / 2
+                        right_boundary.append([
+                            point[0] + perp_x * offset,
+                            point[1] + perp_y * offset
+                        ])
+            
+            if left_boundary and right_boundary:
+                map_data["edges"].append({
+                    "id": edge_id,
+                    "left_boundary": left_boundary,
+                    "right_boundary": right_boundary,
+                    "lanes": [l["id"] for l in lanes]
+                })
         
         # Extract junction data
         for node in sumo_net.getNodes():
