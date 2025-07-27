@@ -119,11 +119,12 @@ app.layout = html.Div([
                 dcc.Checklist(
                     id='display-options',
                     options=[
+                        {'label': 'Track AV', 'value': 'track_av'},
                         {'label': 'Vehicle Labels', 'value': 'labels'},
                         {'label': 'Traffic Lights', 'value': 'traffic_lights'},
                         {'label': 'Construction Zones', 'value': 'construction'}
                     ],
-                    value=[],  # Default to none selected
+                    value=['track_av'],  # Default to track AV
                     style={'marginBottom': '10px', 'fontSize': '13px'}
                 )
             ], style=styles['controlPanel']),
@@ -182,6 +183,15 @@ def get_map_data(simulation_uuid):
 def create_map_traces(map_data, sim_state, display_options):
     """Create all map traces for the visualization."""
     traces = []
+    
+    # Get AV position if tracking
+    av_x, av_y = None, None
+    if 'track_av' in display_options and sim_state:
+        vehicles = sim_state.get("agent_details", {}).get("vehicle", {})
+        for vid, vdata in vehicles.items():
+            if "AV" in vid:
+                av_x, av_y = vdata["x"], vdata["y"]
+                break
     
     # Draw all lane boundaries (edges and dividers)
     if map_data and "edges" in map_data:
@@ -459,15 +469,37 @@ def update_visualization(n, map_data, display_options):
             font=dict(color='#333'),
             xaxis=dict(gridcolor='#e0e0e0', zerolinecolor='#ccc'),
             yaxis=dict(gridcolor='#e0e0e0', zerolinecolor='#ccc'),
-            uirevision='constant'  # Keep zoom/pan state
+            uirevision='display-options' if 'track_av' not in display_options else None  # Keep zoom only when not tracking
         )
         
         # Set axis properties
-        if "bounds" in map_data:
-            bounds = map_data["bounds"]
-            margin = 50
-            fig.update_xaxes(range=[bounds["min_x"]-margin, bounds["max_x"]+margin])
-            fig.update_yaxes(range=[bounds["min_y"]-margin, bounds["max_y"]+margin])
+        if 'track_av' in display_options and sim_state:
+            # Find AV position
+            vehicles = sim_state.get("agent_details", {}).get("vehicle", {})
+            av_found = False
+            for vid, vdata in vehicles.items():
+                if "AV" in vid:
+                    av_x, av_y = vdata["x"], vdata["y"]
+                    # Set view window centered on AV (50m range)
+                    view_range = 50
+                    fig.update_xaxes(range=[av_x - view_range, av_x + view_range])
+                    fig.update_yaxes(range=[av_y - view_range, av_y + view_range])
+                    av_found = True
+                    break
+            
+            if not av_found and "bounds" in map_data:
+                # Fallback to full map view if no AV found
+                bounds = map_data["bounds"]
+                margin = 50
+                fig.update_xaxes(range=[bounds["min_x"]-margin, bounds["max_x"]+margin])
+                fig.update_yaxes(range=[bounds["min_y"]-margin, bounds["max_y"]+margin])
+        else:
+            # Normal full map view
+            if "bounds" in map_data:
+                bounds = map_data["bounds"]
+                margin = 50
+                fig.update_xaxes(range=[bounds["min_x"]-margin, bounds["max_x"]+margin])
+                fig.update_yaxes(range=[bounds["min_y"]-margin, bounds["max_y"]+margin])
         
         # Equal aspect ratio
         fig.update_yaxes(scaleanchor="x", scaleratio=1)
