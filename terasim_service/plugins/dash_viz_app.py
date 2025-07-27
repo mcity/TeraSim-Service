@@ -36,48 +36,59 @@ redis_client = redis.Redis(host=args.redis_host, port=args.redis_port, decode_re
 app = dash.Dash(__name__, update_title=None)
 app.title = "TeraSim Real-time Visualization"
 
-# Define CSS styles
+# Define CSS styles - Minimalist theme
 styles = {
     'container': {
         'padding': '20px',
-        'fontFamily': 'Arial, sans-serif'
+        'fontFamily': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        'backgroundColor': '#ffffff',
+        'minHeight': '100vh'
     },
     'header': {
-        'backgroundColor': '#f0f0f0',
-        'padding': '10px',
+        'backgroundColor': '#f8f8f8',
+        'padding': '15px',
         'marginBottom': '20px',
-        'borderRadius': '5px'
+        'borderRadius': '0',
+        'borderBottom': '1px solid #e0e0e0'
     },
     'title': {
-        'fontSize': '24px',
-        'fontWeight': 'bold',
-        'marginBottom': '10px'
+        'fontSize': '28px',
+        'fontWeight': '300',
+        'marginBottom': '10px',
+        'letterSpacing': '2px',
+        'color': '#333333'
     },
     'info': {
-        'fontSize': '14px',
-        'color': '#666'
+        'fontSize': '13px',
+        'color': '#666666',
+        'fontFamily': 'monospace'
     },
     'controlPanel': {
         'backgroundColor': '#f8f8f8',
         'padding': '15px',
-        'borderRadius': '5px',
-        'marginBottom': '20px'
+        'borderRadius': '0',
+        'marginBottom': '20px',
+        'border': '1px solid #e0e0e0'
     },
     'metric': {
-        'backgroundColor': 'white',
-        'padding': '10px',
-        'borderRadius': '5px',
-        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+        'backgroundColor': '#ffffff',
+        'padding': '12px',
+        'borderRadius': '0',
+        'border': '1px solid #e0e0e0',
         'marginBottom': '10px'
     },
     'metricTitle': {
-        'fontSize': '12px',
-        'color': '#666',
-        'marginBottom': '5px'
+        'fontSize': '11px',
+        'color': '#666666',
+        'marginBottom': '5px',
+        'textTransform': 'uppercase',
+        'letterSpacing': '1px'
     },
     'metricValue': {
-        'fontSize': '20px',
-        'fontWeight': 'bold'
+        'fontSize': '24px',
+        'fontWeight': '300',
+        'color': '#333333',
+        'fontFamily': 'monospace'
     }
 }
 
@@ -85,7 +96,7 @@ styles = {
 app.layout = html.Div([
     # Header
     html.Div([
-        html.H1("🚗 TeraSim Real-time Visualization", style=styles['title']),
+        html.H1("TeraSim Real-time Visualization", style=styles['title']),
         html.Div(f"Simulation ID: {args.simulation_uuid}", style=styles['info'])
     ], style=styles['header']),
     
@@ -96,7 +107,7 @@ app.layout = html.Div([
             dcc.Graph(
                 id='live-map',
                 style={'height': '700px'},
-                config={'displayModeBar': True, 'displaylogo': False}
+                config={'displayModeBar': True, 'displaylogo': False, 'toImageButtonOptions': {'format': 'png', 'filename': 'terasim_map'}}
             )
         ], style={'width': '75%', 'display': 'inline-block', 'verticalAlign': 'top'}),
         
@@ -104,41 +115,28 @@ app.layout = html.Div([
         html.Div([
             # Control Panel
             html.Div([
-                html.H3("Control Panel", style={'marginBottom': '15px'}),
-                html.Label("Refresh Interval (seconds):", style={'marginRight': '10px'}),
-                dcc.Slider(
-                    id='interval-slider',
-                    min=0.1,
-                    max=2.0,
-                    step=0.1,
-                    value=args.update_interval,  # Use the provided interval
-                    marks={i/10: str(i/10) for i in range(1, 21, 5)},
-                    tooltip={"placement": "bottom", "always_visible": True}
-                ),
-                html.Div(style={'marginBottom': '20px'}),
-                
-                # Checkboxes
+                html.H3("DISPLAY OPTIONS", style={'marginBottom': '15px', 'fontSize': '14px', 'fontWeight': '300', 'letterSpacing': '1px', 'color': '#888'}),
                 dcc.Checklist(
                     id='display-options',
                     options=[
-                        {'label': ' Show Vehicle Labels', 'value': 'labels'},
-                        {'label': ' Show Traffic Lights', 'value': 'traffic_lights'},
-                        {'label': ' Show Construction Zones', 'value': 'construction'}
+                        {'label': 'Vehicle Labels', 'value': 'labels'},
+                        {'label': 'Traffic Lights', 'value': 'traffic_lights'},
+                        {'label': 'Construction Zones', 'value': 'construction'}
                     ],
-                    value=['labels', 'traffic_lights', 'construction'],
-                    style={'marginBottom': '10px'}
+                    value=[],  # Default to none selected
+                    style={'marginBottom': '10px', 'fontSize': '13px'}
                 )
             ], style=styles['controlPanel']),
             
             # Statistics
             html.Div([
-                html.H3("📊 Statistics", style={'marginBottom': '15px'}),
+                html.H3("STATISTICS", style={'marginBottom': '15px', 'fontSize': '14px', 'fontWeight': '300', 'letterSpacing': '1px', 'color': '#888'}),
                 html.Div(id='stats-container')
             ], style={'marginTop': '20px'}),
             
             # Status
             html.Div([
-                html.H3("🔄 Status", style={'marginBottom': '15px'}),
+                html.H3("STATUS", style={'marginBottom': '15px', 'fontSize': '14px', 'fontWeight': '300', 'letterSpacing': '1px', 'color': '#888'}),
                 html.Div(id='status-container')
             ], style={'marginTop': '20px'})
             
@@ -223,7 +221,7 @@ def create_map_traces(map_data, sim_state, display_options):
                 x=x_coords,
                 y=y_coords,
                 mode='lines',
-                line=dict(color='lightgray', width=1, dash='dot'),  # Thin dotted line
+                line=dict(color='lightgray', width=1, dash='dot'),  # Gray dotted center line
                 name=f'Lane {lane["id"]}',
                 showlegend=False,
                 hovertemplate=f'Lane: {lane["id"]}<br>Speed limit: {lane["speed_limit"]:.1f} m/s<extra></extra>'
@@ -259,16 +257,13 @@ def create_map_traces(map_data, sim_state, display_options):
                 text = vid if show_labels else ""
                 hover = f'{vid}<br>Speed: {vdata["speed"]:.1f} m/s<br>Type: {vdata["type"]}'
                 
-                # Determine vehicle color
+                # Determine vehicle color - original colors
                 if "AV" in vid:
                     color = 'red'
-                    vtype = 'AV'
                 elif "BV" in vid:
                     color = 'blue'
-                    vtype = 'BV'
                 else:
                     color = 'green'
-                    vtype = 'Other'
                 
                 # Get vehicle angle (SUMO angle: 0=North, clockwise)
                 sumo_angle = vdata.get("sumo_angle", 0)
@@ -416,16 +411,6 @@ def load_map_data(n):
     return dash.no_update
 
 
-# Callback to update interval
-@app.callback(
-    Output('interval-component', 'interval'),
-    Input('interval-slider', 'value')
-)
-def update_interval(value):
-    """Update the refresh interval."""
-    return value * 1000  # Convert to milliseconds
-
-
 # Main update callback
 @app.callback(
     [Output('live-map', 'figure'),
@@ -460,13 +445,20 @@ def update_visualization(n, map_data, display_options):
         
         # Update layout
         fig.update_layout(
-            title="TeraSim Simulation Map",
+            title=dict(
+                text="SIMULATION MAP",
+                font=dict(size=16, color='#333', family='sans-serif')
+            ),
             xaxis_title="X (m)",
             yaxis_title="Y (m)",
             hovermode='closest',
             height=700,
-            showlegend=True,
-            plot_bgcolor='rgba(240, 240, 240, 0.5)',
+            showlegend=False,
+            plot_bgcolor='#f8f8f8',
+            paper_bgcolor='white',
+            font=dict(color='#333'),
+            xaxis=dict(gridcolor='#e0e0e0', zerolinecolor='#ccc'),
+            yaxis=dict(gridcolor='#e0e0e0', zerolinecolor='#ccc'),
             uirevision='constant'  # Keep zoom/pan state
         )
         
@@ -512,29 +504,30 @@ def update_visualization(n, map_data, display_options):
         status = redis_client.get(f"simulation:{args.simulation_uuid}:status") or "Unknown"
         status_children = [
             html.Div([
-                html.Div(f"✅ Status: {status}", style={'color': 'green', 'fontWeight': 'bold'}),
-                html.Div(f"Last update: {datetime.now().strftime('%H:%M:%S')}", 
-                        style={'color': '#666', 'fontSize': '12px', 'marginTop': '5px'})
+                html.Div(f"STATUS: {status.upper()}", style={'color': 'green', 'fontSize': '14px', 'fontFamily': 'monospace'}),
+                html.Div(f"UPDATED: {datetime.now().strftime('%H:%M:%S')}", 
+                        style={'color': '#666', 'fontSize': '11px', 'marginTop': '5px', 'fontFamily': 'monospace'})
             ])
         ]
         
     else:
         # No data available
         fig.add_annotation(
-            text="Waiting for simulation data...",
+            text="WAITING FOR SIMULATION DATA",
             xref="paper", yref="paper",
             x=0.5, y=0.5,
             showarrow=False,
-            font=dict(size=20, color="gray")
+            font=dict(size=14, color="#666", family='monospace')
         )
         fig.update_layout(
             xaxis=dict(visible=False),
             yaxis=dict(visible=False),
-            plot_bgcolor='white'
+            plot_bgcolor='white',
+            paper_bgcolor='white'
         )
         
-        stats_children = [html.Div("No data available", style={'color': 'gray'})]
-        status_children = [html.Div("Waiting for simulation...", style={'color': 'orange'})]
+        stats_children = [html.Div("NO DATA AVAILABLE", style={'color': '#666', 'fontSize': '12px', 'fontFamily': 'monospace'})]
+        status_children = [html.Div("WAITING", style={'color': 'orange', 'fontSize': '14px', 'fontFamily': 'monospace'})]
     
     return fig, stats_children, status_children
 
