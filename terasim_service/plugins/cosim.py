@@ -5,6 +5,8 @@ import numpy as np
 import redis
 from redis.exceptions import RedisError
 import time
+import subprocess
+from pathlib import Path
 
 from terasim.overlay import traci
 from terasim.simulator import Simulator
@@ -117,6 +119,9 @@ class TeraSimCoSimPlugin(BasePlugin):
         base_dir: str = "output",
         key_expiry=3600,
         auto_run=False,
+        enable_viz=False,
+        viz_port=8501,
+        viz_update_freq=5,
     ):
         """Initialize the Co-Simulation plugin.
 
@@ -127,11 +132,21 @@ class TeraSimCoSimPlugin(BasePlugin):
             base_dir (str, optional): Base directory for the log file. Defaults to "output".
             key_expiry (int, optional): Key expiration time in seconds. Defaults to 3600.
             auto_run (bool, optional): Flag to enable auto-run mode. Defaults to False.
+            enable_viz (bool, optional): Enable visualization with Streamlit. Defaults to False.
+            viz_port (int, optional): Port for Streamlit server. Defaults to 8501.
+            viz_update_freq (int, optional): Visualization update frequency. Defaults to 5.
         """
         super().__init__(simulation_uuid, plugin_config, redis_config)
         # Key expiration time in seconds (default: 1 hour)
         self.key_expiry = key_expiry
         self.auto_run = auto_run
+        self.base_dir = base_dir
+
+        # Visualization settings
+        self.enable_viz = enable_viz
+        self.viz_port = viz_port
+        self.viz_update_freq = viz_update_freq
+        self.viz_process = None
 
         # Setup logging
         self.logger = self._setup_logger(base_dir)
@@ -235,8 +250,26 @@ class TeraSimCoSimPlugin(BasePlugin):
                 f"Redis connection established. Simulation UUID: {self.simulation_uuid}, finish initialization!"
             )
 
-            # Add this line to write initial simulation state
-            # self._write_simulation_state(simulator)
+            # Extract map data and start visualization if enabled
+            if self.enable_viz:
+                self.logger.info("Visualization enabled, extracting map data...")
+                map_data = self._extract_map_geometry(simulator.sumo_net)
+                
+                # Store map data in Redis
+                self.redis_client.set(
+                    f"simulation:{self.simulation_uuid}:map_data",
+                    json.dumps(map_data),
+                    ex=self.key_expiry
+                )
+                
+                self.logger.info(
+                    f"Map data extracted: {len(map_data['lanes'])} lanes, "
+                    f"{len(map_data['junctions'])} junctions, "
+                    f"{len(map_data['traffic_lights'])} traffic lights"
+                )
+                
+                # Start Streamlit visualization
+                self._start_streamlit_service()
 
             return True
         except RedisError as e:
@@ -330,6 +363,16 @@ class TeraSimCoSimPlugin(BasePlugin):
             ctx (dict): The context information.
         """
         try:
+            # Stop visualization if enabled
+            if self.enable_viz and self.viz_process:
+                self.logger.info("Stopping visualization service...")
+                try:
+                    self.viz_process.terminate()
+                    self.viz_process.wait(timeout=5)
+                    self.logger.info("Visualization service stopped")
+                except Exception as e:
+                    self.logger.error(f"Error stopping visualization: {e}")
+                    
             if self.redis_client:
                 finish_string = f"Simulation {self.simulation_uuid} finished!"
                 # Set simulation end status briefly before cleanup
@@ -350,14 +393,9 @@ class TeraSimCoSimPlugin(BasePlugin):
                     ex=1800,  # Keep status for 30 minutes
                 )
 
-                # Clean up all simulation related data, except status
-                # keys_pattern = f"simulation:{self.simulation_uuid}:*"
-                # status_key = f"simulation:{self.simulation_uuid}:status"
-                # result_key = f"simulation:{self.simulation_uuid}:result"
-                # for key in self.redis_client.scan_iter(match=keys_pattern):
-                #     if key.decode() != status_key and key.decode() != result_key:
-                #         # Delete all keys except status and result
-                #         self.redis_client.delete(key)
+                # Clean up visualization data if enabled
+                if self.enable_viz:
+                    self.redis_client.delete(f"simulation:{self.simulation_uuid}:map_data")
 
                 # Close Redis connection
                 self.redis_client.close()
@@ -753,5 +791,132 @@ class TeraSimCoSimPlugin(BasePlugin):
                 self._handle_agent_command(command_data)
         except Exception as e:
             self.logger.error(f"Error handling pending agent commands: {e}")
+
+    def _extract_map_geometry(self, sumo_net):
+        """Extract static map geometry from SUMO network."""
+        map_data = {
+            "lanes": [],
+            "junctions": [],
+            "traffic_lights": [],
+            "bounds": {
+                "min_x": float('inf'),
+                "max_x": float('-inf'),
+                "min_y": float('inf'),
+                "max_y": float('-inf')
+            }
+        }
+        
+        # Extract lane data
+        for edge in sumo_net.getEdges():
+            for lane in edge.getLanes():
+                lane_shape = lane.getShape()
+                if lane_shape:
+                    # Convert to list of lists and update bounds
+                    shape_list = []
+                    for x, y in lane_shape:
+                        shape_list.append([float(x), float(y)])
+                        map_data["bounds"]["min_x"] = min(map_data["bounds"]["min_x"], x)
+                        map_data["bounds"]["max_x"] = max(map_data["bounds"]["max_x"], x)
+                        map_data["bounds"]["min_y"] = min(map_data["bounds"]["min_y"], y)
+                        map_data["bounds"]["max_y"] = max(map_data["bounds"]["max_y"], y)
+                    
+                    map_data["lanes"].append({
+                        "id": lane.getID(),
+                        "shape": shape_list,
+                        "width": float(lane.getWidth()),
+                        "speed_limit": float(lane.getSpeed()),
+                        "length": float(lane.getLength()),
+                        "edge_id": edge.getID()
+                    })
+        
+        # Extract junction data
+        for node in sumo_net.getNodes():
+            if node.getType() not in ["dead_end", "rail_crossing"]:
+                shape = node.getShape()
+                if shape:
+                    shape_list = [[float(x), float(y)] for x, y in shape]
+                    coord = node.getCoord()
+                    map_data["junctions"].append({
+                        "id": node.getID(),
+                        "shape": shape_list,
+                        "position": [float(coord[0]), float(coord[1])],
+                        "type": node.getType()
+                    })
+        
+        # Extract traffic light data with actual positions
+        # TODO: Fix TLS API - getNodes() doesn't exist, need to find correct method
+        # Temporarily commented out to allow visualization to start
+        '''
+        for tls in sumo_net.getTrafficLights():
+            tls_id = tls.getID()
+            
+            # Get controlled nodes to find traffic light positions
+            controlled_nodes = tls.getNodes()
+            
+            for node in controlled_nodes:
+                coord = node.getCoord()
+                
+                # Get controlled lanes for this traffic light
+                controlled_lanes = []
+                for connection in tls.getConnections():
+                    from_lane_id = connection.getFromLane().getID()
+                    to_lane_id = connection.getToLane().getID()
+                    controlled_lanes.append({
+                        "from": from_lane_id,
+                        "to": to_lane_id
+                    })
+                
+                map_data["traffic_lights"].append({
+                    "id": tls_id,
+                    "position": [float(coord[0]), float(coord[1])],
+                    "node_id": node.getID(),
+                    "controlled_lanes": controlled_lanes
+                })
+        '''
+        
+        return map_data
+
+    def _start_streamlit_service(self):
+        """Start the Dash visualization service."""
+        try:
+            # Path to Dash app (now using Dash by default)
+            viz_app_path = Path(__file__).parent / "dash_viz_app.py"
+            
+            if not viz_app_path.exists():
+                self.logger.error(f"Dash app not found at {viz_app_path}")
+                return
+            
+            # Start Dash process
+            cmd = [
+                "python", str(viz_app_path),
+                "--simulation_uuid", self.simulation_uuid,
+                "--redis_host", self.redis_config.get("host", "localhost"),
+                "--redis_port", str(self.redis_config.get("port", 6379)),
+                "--port", str(self.viz_port),
+                "--update_interval", str(1.0 / self.viz_update_freq)  # Convert frequency to interval
+            ]
+            
+            self.viz_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            self.logger.info(
+                f"🎨 Dash visualization started at http://localhost:{self.viz_port}"
+            )
+            
+            # Give it a moment to start
+            time.sleep(2)
+            
+            # Check if process started successfully
+            if self.viz_process.poll() is not None:
+                stdout, stderr = self.viz_process.communicate()
+                self.logger.error(f"Dash process failed to start: {stderr}")
+                raise RuntimeError(f"Dash process failed to start: {stderr}")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to start visualization service: {e}")
 
 

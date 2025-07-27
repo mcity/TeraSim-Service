@@ -13,7 +13,10 @@ from fastapi_mcp import FastApiMCP
 from loguru import logger
 from pydantic import Field
 
-from terasim_service.plugins import DEFAULT_COSIM_PLUGIN_CONFIG, TeraSimCoSimPlugin
+from terasim_service.plugins import (
+    DEFAULT_COSIM_PLUGIN_CONFIG, 
+    TeraSimCoSimPlugin
+)
 from terasim_service.utils import (
     check_redis_connection,
     create_environment,
@@ -62,9 +65,9 @@ def check_simulation_running(simulation_id: str, redis_client: redis.Redis) -> b
     return status is not None
 
 
-def run_simulation_process(simulation_id: str, config: dict, auto_run: bool):
+def run_simulation_process(simulation_id: str, config: dict, auto_run: bool, enable_viz: bool = False, viz_port: int = 8501, viz_update_freq: int = 5):
     # This function will run in a separate process
-    asyncio.run(run_simulation_task(simulation_id, config, auto_run))
+    asyncio.run(run_simulation_task(simulation_id, config, auto_run, enable_viz, viz_port, viz_update_freq))
 
 
 description = """
@@ -171,7 +174,7 @@ async def get_av_route(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
+async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool, enable_viz: bool = False, viz_port: int = 8501, viz_update_freq: int = 5):
     try:
         base_dir = (
             Path(config["output"]["dir"])
@@ -193,14 +196,17 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
             logger.info(f"Failed to get map metadata: {e}")
         sim.bind_env(env)
 
-        # Create and inject TeraSimControlPlugin
+        # Create and inject TeraSimControlPlugin with visualization support
         terasim_cosim_plugin_config = DEFAULT_COSIM_PLUGIN_CONFIG
         terasim_cosim_plugin_config["centered_agent_ID"] = "AV"
         terasim_cosim_plugin = TeraSimCoSimPlugin(
             simulation_uuid=simulation_id, 
             plugin_config=terasim_cosim_plugin_config,
             base_dir=str(base_dir),
-            auto_run=auto_run, 
+            auto_run=auto_run,
+            enable_viz=enable_viz,
+            viz_port=viz_port,
+            viz_update_freq=viz_update_freq
         )
         terasim_cosim_plugin.inject(sim, {})
         
@@ -227,7 +233,10 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool):
 
 @app.post("/start_simulation", tags=["simulations"], summary="Start a new TeraSim simulation")
 async def start_simulation(
-    config: Annotated[SimulationConfig, Field(description="TeraSim simulation configuration including config file path and auto-run setting")]
+    config: Annotated[SimulationConfig, Field(description="TeraSim simulation configuration including config file path and auto-run setting")],
+    enable_viz: bool = False,
+    viz_port: int = 8501,
+    viz_update_freq: int = 5
 ):
     """
     Start a new TeraSim simulation with advanced scenario generation capabilities.
@@ -257,7 +266,7 @@ async def start_simulation(
     # Start the simulation in a new process
     process = Process(
         target=run_simulation_process,
-        args=(simulation_id, config_data, config.auto_run),
+        args=(simulation_id, config_data, config.auto_run, enable_viz, viz_port, viz_update_freq),
     )
     process.start()
 
@@ -268,7 +277,13 @@ async def start_simulation(
         "status": "started"
     }
 
-    return {"simulation_id": simulation_id, "message": "Simulation started"}
+    response = {"simulation_id": simulation_id, "message": "Simulation started"}
+    
+    if enable_viz:
+        response["visualization_url"] = f"http://localhost:{viz_port}"
+        response["message"] += " with visualization"
+
+    return response
 
 
 @app.get(
