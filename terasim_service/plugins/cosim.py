@@ -830,7 +830,7 @@ class TeraSimCoSimPlugin(BasePlugin):
                         "edge_id": edge.getID()
                     })
         
-        # Calculate edge boundaries
+        # Calculate all lane boundaries for each edge
         edges_dict = {}
         for lane_data in map_data["lanes"]:
             edge_id = lane_data["edge_id"]
@@ -838,7 +838,7 @@ class TeraSimCoSimPlugin(BasePlugin):
                 edges_dict[edge_id] = []
             edges_dict[edge_id].append(lane_data)
         
-        # For each edge, calculate left and right boundaries
+        # For each edge, calculate all lane boundaries
         for edge_id, lanes in edges_dict.items():
             if not lanes:
                 continue
@@ -846,55 +846,82 @@ class TeraSimCoSimPlugin(BasePlugin):
             # Sort lanes by their index (assuming lane IDs end with _0, _1, etc.)
             lanes.sort(key=lambda l: int(l["id"].split("_")[-1]))
             
-            # Get leftmost and rightmost lanes
-            leftmost = lanes[0]
-            rightmost = lanes[-1]
+            # Calculate boundary for each lane
+            lane_boundaries = []
             
-            # Calculate boundaries
-            left_boundary = []
-            right_boundary = []
-            
-            # For leftmost lane, calculate left boundary
-            for i, point in enumerate(leftmost["shape"]):
-                if i < len(leftmost["shape"]) - 1:
+            # Helper function to calculate boundary line
+            def calculate_boundary(lane_shape, lane_width, side):
+                """Calculate left or right boundary of a lane.
+                side: -1 for left boundary, 1 for right boundary
+                """
+                boundary = []
+                for i, point in enumerate(lane_shape):
                     # Calculate perpendicular vector
-                    dx = leftmost["shape"][i+1][0] - point[0]
-                    dy = leftmost["shape"][i+1][1] - point[1]
+                    if i < len(lane_shape) - 1:
+                        # Use next point for direction
+                        dx = lane_shape[i+1][0] - point[0]
+                        dy = lane_shape[i+1][1] - point[1]
+                    else:
+                        # For last point, use previous point for direction
+                        dx = point[0] - lane_shape[i-1][0]
+                        dy = point[1] - lane_shape[i-1][1]
+                    
                     length = (dx**2 + dy**2)**0.5
                     if length > 0:
-                        # Perpendicular vector pointing left
-                        perp_x = -dy / length
-                        perp_y = dx / length
+                        # Perpendicular vector (left: -dy,dx; right: dy,-dx)
+                        if side < 0:  # left
+                            perp_x = -dy / length
+                            perp_y = dx / length
+                        else:  # right
+                            perp_x = dy / length
+                            perp_y = -dx / length
+                        
                         # Offset by half lane width
-                        offset = leftmost["width"] / 2
-                        left_boundary.append([
+                        offset = lane_width / 2
+                        boundary.append([
                             point[0] + perp_x * offset,
                             point[1] + perp_y * offset
                         ])
+                return boundary
             
-            # For rightmost lane, calculate right boundary
-            for i, point in enumerate(rightmost["shape"]):
-                if i < len(rightmost["shape"]) - 1:
-                    # Calculate perpendicular vector
-                    dx = rightmost["shape"][i+1][0] - point[0]
-                    dy = rightmost["shape"][i+1][1] - point[1]
-                    length = (dx**2 + dy**2)**0.5
-                    if length > 0:
-                        # Perpendicular vector pointing right
-                        perp_x = dy / length
-                        perp_y = -dx / length
-                        # Offset by half lane width
-                        offset = rightmost["width"] / 2
-                        right_boundary.append([
-                            point[0] + perp_x * offset,
-                            point[1] + perp_y * offset
-                        ])
+            # Calculate boundaries for all lanes
+            all_boundaries = []
             
-            if left_boundary and right_boundary:
+            # Right boundary of the rightmost lane (road edge)
+            if lanes:
+                right_edge = calculate_boundary(lanes[0]["shape"], lanes[0]["width"], 1)
+                if right_edge:
+                    all_boundaries.append({
+                        "points": right_edge,
+                        "type": "edge",
+                        "side": "right"
+                    })
+            
+            # Boundaries between lanes
+            for i in range(len(lanes) - 1):
+                # Left boundary of current lane = right boundary of next lane
+                lane_divider = calculate_boundary(lanes[i]["shape"], lanes[i]["width"], -1)
+                if lane_divider:
+                    all_boundaries.append({
+                        "points": lane_divider,
+                        "type": "divider",
+                        "between": [lanes[i]["id"], lanes[i+1]["id"]]
+                    })
+            
+            # Left boundary of the leftmost lane (road edge)
+            if lanes:
+                left_edge = calculate_boundary(lanes[-1]["shape"], lanes[-1]["width"], -1)
+                if left_edge:
+                    all_boundaries.append({
+                        "points": left_edge,
+                        "type": "edge",
+                        "side": "left"
+                    })
+            
+            if all_boundaries:
                 map_data["edges"].append({
                     "id": edge_id,
-                    "left_boundary": left_boundary,
-                    "right_boundary": right_boundary,
+                    "boundaries": all_boundaries,
                     "lanes": [l["id"] for l in lanes]
                 })
         

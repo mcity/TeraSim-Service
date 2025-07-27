@@ -185,36 +185,33 @@ def create_map_traces(map_data, sim_state, display_options):
     """Create all map traces for the visualization."""
     traces = []
     
-    # Draw edge boundaries first (road outlines)
+    # Draw all lane boundaries (edges and dividers)
     if map_data and "edges" in map_data:
         for edge in map_data["edges"]:
-            # Draw left boundary
-            if edge["left_boundary"]:
-                x_coords = [pt[0] for pt in edge["left_boundary"]]
-                y_coords = [pt[1] for pt in edge["left_boundary"]]
-                traces.append(go.Scatter(
-                    x=x_coords,
-                    y=y_coords,
-                    mode='lines',
-                    line=dict(color='black', width=2),
-                    name=f'Edge {edge["id"]} left',
-                    showlegend=False,
-                    hoverinfo='skip'
-                ))
-            
-            # Draw right boundary
-            if edge["right_boundary"]:
-                x_coords = [pt[0] for pt in edge["right_boundary"]]
-                y_coords = [pt[1] for pt in edge["right_boundary"]]
-                traces.append(go.Scatter(
-                    x=x_coords,
-                    y=y_coords,
-                    mode='lines',
-                    line=dict(color='black', width=2),
-                    name=f'Edge {edge["id"]} right',
-                    showlegend=False,
-                    hoverinfo='skip'
-                ))
+            if "boundaries" in edge:
+                for boundary in edge["boundaries"]:
+                    x_coords = [pt[0] for pt in boundary["points"]]
+                    y_coords = [pt[1] for pt in boundary["points"]]
+                    
+                    # Different styles for edge boundaries vs lane dividers
+                    if boundary["type"] == "edge":
+                        # Road edge - solid black line
+                        line_style = dict(color='black', width=2)
+                        name = f'Edge {edge["id"]} {boundary.get("side", "")}'
+                    else:
+                        # Lane divider - dashed black line
+                        line_style = dict(color='black', width=2, dash='dash')
+                        name = f'Divider {edge["id"]}'
+                    
+                    traces.append(go.Scatter(
+                        x=x_coords,
+                        y=y_coords,
+                        mode='lines',
+                        line=line_style,
+                        name=name,
+                        showlegend=False,
+                        hoverinfo='skip'
+                    ))
     
     # Draw lanes (as thin center lines)
     if map_data and "lanes" in map_data:
