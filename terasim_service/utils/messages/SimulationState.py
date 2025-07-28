@@ -23,3 +23,6 @@ class SimulationState(BaseModel):
 
     # Details of the construction zones, the key is the construction zone lane ID, and the value is its shape
     construction_zone_details: Dict[str, list[list[float]]] = {}
+    
+    # Details of construction objects (cones, barriers, signs), the key is the object ID, and the value is the object state
+    construction_objects: Dict[str, AgentStateSimplified] = {}

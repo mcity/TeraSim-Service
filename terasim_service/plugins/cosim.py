@@ -486,10 +486,11 @@ class TeraSimCoSimPlugin(BasePlugin):
     def get_vehicle_vru_ids(self):
         """Get all vehicle and VRU IDs in the simulation."""
         all_ids = list(set(traci.vehicle.getIDList() + traci.person.getIDList()))
-        # vehicle id is the id with BV/AV prefix, vru id is the id with VRU prefix
-        vru_ids = [id for id in all_ids if "VRU" in id]
-        vehicle_ids = [id for id in all_ids if id not in vru_ids]
-        return vehicle_ids, vru_ids
+        # Separate by type: construction objects, VRUs, and regular vehicles
+        construction_ids = [id for id in all_ids if id.startswith("CONSTRUCTION_")]
+        vru_ids = [id for id in all_ids if "VRU" in id and id not in construction_ids]
+        vehicle_ids = [id for id in all_ids if id not in vru_ids and id not in construction_ids]
+        return vehicle_ids, vru_ids, construction_ids
 
     def _write_simulation_state(self, simulator):
         """Write the current simulation state to Redis.
@@ -504,10 +505,11 @@ class TeraSimCoSimPlugin(BasePlugin):
             simulation_state.simulation_time = traci.simulation.getTime()
 
             # Get all interested agent IDs
-            vehicle_ids, vru_ids = self.get_vehicle_vru_ids()
+            vehicle_ids, vru_ids, construction_ids = self.get_vehicle_vru_ids()
             simulation_state.agent_count = {
                 "vehicle": len(vehicle_ids),
                 "vru": len(vru_ids),
+                "construction": len(construction_ids),
             }
 
             # Add vehicle states
@@ -593,6 +595,25 @@ class TeraSimCoSimPlugin(BasePlugin):
                 vrus[vru_id] = vru_state
 
             simulation_state.agent_details["vru"] = vrus
+
+            # Add construction objects
+            construction_objects = {}
+            for cid in construction_ids:
+                construction_state = AgentStateSimplified()
+                construction_state.x, construction_state.y, construction_state.z = traci.vehicle.getPosition3D(cid)
+                construction_state.lon, construction_state.lat = traci.simulation.convertGeo(construction_state.x, construction_state.y)
+                construction_state.sumo_angle = traci.vehicle.getAngle(cid)
+                construction_state.orientation = np.radians((90 - construction_state.sumo_angle) % 360)
+                construction_state.speed = traci.vehicle.getSpeed(cid)
+                construction_state.acceleration = traci.vehicle.getAcceleration(cid)
+                construction_state.length = traci.vehicle.getLength(cid)
+                construction_state.width = traci.vehicle.getWidth(cid)
+                construction_state.height = traci.vehicle.getHeight(cid)
+                construction_state.type = traci.vehicle.getTypeID(cid)
+                construction_state.angular_velocity = 0.0
+                construction_objects[cid] = construction_state
+                
+            simulation_state.construction_objects = construction_objects
 
             # Add traffic light states
             traffic_lights = {}

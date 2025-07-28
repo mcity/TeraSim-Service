@@ -355,6 +355,36 @@ def create_map_traces(map_data, sim_state, display_options):
                 name='VRU',
                 hovertemplate='VRU: %{text}<extra></extra>'
             ))
+        
+        # Draw construction objects
+        construction_objects = sim_state.get("construction_objects", {})
+        if construction_objects:
+            for cid, cdata in construction_objects.items():
+                # Determine icon based on type
+                if cdata["type"] == "CONSTRUCTION_CONE":
+                    color = 'orange'
+                    symbol = 'triangle-up'
+                    size = 6
+                elif cdata["type"] == "CONSTRUCTION_BARRIER":
+                    color = 'yellow'
+                    symbol = 'square'
+                    size = 8
+                elif cdata["type"] == "CONSTRUCTION_SIGN":
+                    color = 'red'
+                    symbol = 'diamond'
+                    size = 10
+                else:
+                    color = 'gray'
+                    symbol = 'circle'
+                    size = 6
+                
+                traces.append(go.Scatter(
+                    x=[cdata["x"]], y=[cdata["y"]],
+                    mode='markers',
+                    marker=dict(size=size, color=color, symbol=symbol, line=dict(width=1, color='black')),
+                    showlegend=False,
+                    hovertemplate=f'Construction: {cid}<br>Type: {cdata["type"]}<br>Position: ({cdata["x"]:.1f}, {cdata["y"]:.1f})<extra></extra>'
+                ))
     
     # Draw traffic lights
     if 'traffic_lights' in display_options and map_data and "traffic_lights" in map_data:
@@ -507,6 +537,7 @@ def update_visualization(n, map_data, display_options):
         # Create statistics
         vehicles = sim_state.get("agent_details", {}).get("vehicle", {})
         vrus = sim_state.get("agent_details", {}).get("vru", {})
+        construction_objects = sim_state.get("construction_objects", {})
         
         stats_children = [
             html.Div([
@@ -520,6 +551,10 @@ def update_visualization(n, map_data, display_options):
             html.Div([
                 html.Div("VRUs", style=styles['metricTitle']),
                 html.Div(str(len(vrus)), style=styles['metricValue'])
+            ], style=styles['metric']),
+            html.Div([
+                html.Div("Construction", style=styles['metricTitle']),
+                html.Div(str(len(construction_objects)), style=styles['metricValue'])
             ], style=styles['metric'])
         ]
         
