@@ -28,7 +28,7 @@ mypy = "^1.8.0"
 pytest-cov = "^4.1.0"
 bandit = "^1.7.7"
 safety = "^2.3.5"
-requests = "^2.31.0"
+requests = "^2.32.4"
 
 [tool.poetry.scripts]
 terasim-service = "terasim_service.__main__:main"
