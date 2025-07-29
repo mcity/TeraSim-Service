@@ -29,8 +29,16 @@ parser.add_argument("--port", type=int, default=8501)
 parser.add_argument("--update_interval", type=float, default=0.5, help="Update interval in seconds")
 args = parser.parse_args()
 
-# Connect to Redis
-redis_client = redis.Redis(host=args.redis_host, port=args.redis_port, decode_responses=True)
+# Connect to Redis with connection pooling and timeout
+pool = redis.ConnectionPool(
+    host=args.redis_host, 
+    port=args.redis_port, 
+    decode_responses=True,
+    socket_connect_timeout=5,
+    socket_timeout=5,
+    max_connections=10
+)
+redis_client = redis.Redis(connection_pool=pool)
 
 # Initialize Dash app
 app = dash.Dash(__name__, update_title=None)
@@ -161,9 +169,17 @@ app.layout = html.Div([
 def get_simulation_state(simulation_uuid):
     """Get current simulation state from Redis."""
     try:
+        # Set timeout for Redis operations
+        redis_client.ping()  # Check connection
         state_str = redis_client.get(f"simulation:{simulation_uuid}:state")
         if state_str:
             return json.loads(state_str)
+    except redis.ConnectionError as e:
+        logger.error(f"Redis connection error: {e}")
+    except redis.TimeoutError as e:
+        logger.error(f"Redis timeout error: {e}")
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error: {e}")
     except Exception as e:
         logger.error(f"Error getting simulation state: {e}")
     return None
@@ -466,13 +482,17 @@ def update_visualization(n, map_data, display_options):
     # Debug logging
     logger.info(f"Update callback triggered: n_intervals={n}")
     
-    # Get current simulation state
-    sim_state = get_simulation_state(args.simulation_uuid)
-    
-    if sim_state:
-        logger.info(f"Got simulation state, time={sim_state.get('simulation_time', -1)}")
-    else:
-        logger.warning("No simulation state found!")
+    try:
+        # Get current simulation state with timeout protection
+        sim_state = get_simulation_state(args.simulation_uuid)
+        
+        if sim_state:
+            logger.info(f"Got simulation state, time={sim_state.get('simulation_time', -1)}")
+        else:
+            logger.warning("No simulation state found!")
+    except Exception as e:
+        logger.error(f"Failed to get simulation state: {e}")
+        sim_state = None
     
     # Create figure
     fig = go.Figure()
@@ -607,5 +627,7 @@ if __name__ == '__main__':
     app.run(
         host='0.0.0.0',
         port=args.port,
-        debug=False
+        debug=False,
+        dev_tools_silence_routes_logging=True,
+        dev_tools_ui=False
     )
