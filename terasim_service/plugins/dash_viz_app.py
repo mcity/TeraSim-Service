@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--simulation_uuid", required=True)
 parser.add_argument("--redis_host", default="localhost")
 parser.add_argument("--redis_port", type=int, default=6379)
-parser.add_argument("--port", type=int, default=8501)
+parser.add_argument("--port", type=int, default=8050)
 parser.add_argument("--update_interval", type=float, default=0.5, help="Update interval in seconds")
 args = parser.parse_args()
 

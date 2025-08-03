@@ -65,7 +65,7 @@ def check_simulation_running(simulation_id: str, redis_client: redis.Redis) -> b
     return status is not None
 
 
-def run_simulation_process(simulation_id: str, config: dict, auto_run: bool, enable_viz: bool = False, viz_port: int = 8501, viz_update_freq: int = 5):
+def run_simulation_process(simulation_id: str, config: dict, auto_run: bool, enable_viz: bool = False, viz_port: int = 8050, viz_update_freq: int = 5):
     # This function will run in a separate process
     asyncio.run(run_simulation_task(simulation_id, config, auto_run, enable_viz, viz_port, viz_update_freq))
 
@@ -174,7 +174,7 @@ async def get_av_route(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool, enable_viz: bool = False, viz_port: int = 8501, viz_update_freq: int = 5):
+async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool, enable_viz: bool = False, viz_port: int = 8050, viz_update_freq: int = 5):
     try:
         base_dir = (
             Path(config["output"]["dir"])
@@ -235,7 +235,7 @@ async def run_simulation_task(simulation_id: str, config: dict, auto_run: bool, 
 async def start_simulation(
     config: Annotated[SimulationConfig, Field(description="TeraSim simulation configuration including config file path and auto-run setting")],
     enable_viz: bool = False,
-    viz_port: int = 8501,
+    viz_port: int = 8050,
     viz_update_freq: int = 5
 ):
     """

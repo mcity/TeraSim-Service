@@ -1,31 +1,31 @@
-# TeraSim 可视化功能使用指南
+# TeraSim Visualization Usage Guide
 
-## 概述
+## Overview
 
-TeraSim可视化功能已集成到CoSim插件中，提供了实时的仿真状态显示，包括：
-- 🗺️ 地图布局（车道、交叉口）
-- 🚗 车辆位置和状态（AV、BV、其他车辆）
-- 🚶 行人（VRU）位置
-- 🚦 交通灯状态
-- 🚧 施工区域
+TeraSim visualization functionality is integrated into the CoSim plugin, providing real-time simulation state display including:
+- 🗺️ Map layout (lanes, junctions)
+- 🚗 Vehicle positions and states (AV, BV, other vehicles)
+- 🚶 Pedestrian (VRU) positions
+- 🚦 Traffic light states
+- 🚧 Construction zones
 
-## 快速开始
+## Quick Start
 
-### 1. 启动带可视化的仿真
+### 1. Start Simulation with Visualization
 
 ```python
 import requests
 
-# 启动仿真并启用可视化
+# Start simulation with visualization enabled
 response = requests.post("http://localhost:8000/start_simulation", 
     json={
         "config_file": "./config.yaml",
-        "auto_run": False  # 或 True
+        "auto_run": False  # or True
     }, 
     params={
-        "enable_viz": True,      # 启用可视化
-        "viz_port": 8501,        # Streamlit端口
-        "viz_update_freq": 5     # 每5步更新一次
+        "enable_viz": True,      # Enable visualization
+        "viz_port": 8050,        # Dash port
+        "viz_update_freq": 5     # Update every 5 steps
     }
 )
 
@@ -34,92 +34,92 @@ print(f"Simulation ID: {result['simulation_id']}")
 print(f"Visualization URL: {result['visualization_url']}")
 ```
 
-### 2. 访问可视化界面
+### 2. Access Visualization Interface
 
-在浏览器中打开返回的URL（默认 http://localhost:8501）
+Open the returned URL in your browser (default: http://localhost:8050)
 
-## API参数说明
+## API Parameters
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `enable_viz` | bool | False | 是否启用可视化 |
-| `viz_port` | int | 8501 | Streamlit服务端口 |
-| `viz_update_freq` | int | 5 | 可视化更新频率（仿真步数） |
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `enable_viz` | bool | False | Enable visualization |
+| `viz_port` | int | 8050 | Dash service port |
+| `viz_update_freq` | int | 5 | Visualization update frequency (simulation steps) |
 
-## 可视化界面功能
+## Visualization Interface Features
 
-### 控制面板（侧边栏）
-- **Auto Refresh**: 自动刷新开关
-- **Refresh Interval**: 刷新间隔（0.1-2秒）
-- **Show Vehicle Labels**: 显示车辆ID标签
-- **Show Traffic Lights**: 显示交通灯
-- **Show Construction Zones**: 显示施工区域
+### Control Panel (Sidebar)
+- **Auto Refresh**: Toggle automatic refresh
+- **Refresh Interval**: Set refresh interval (0.1-2 seconds)
+- **Show Vehicle Labels**: Display vehicle ID labels
+- **Show Traffic Lights**: Display traffic lights
+- **Show Construction Zones**: Display construction zones
 
-### 主界面
-- **地图视图**: 实时显示仿真场景
-- **统计信息**: 仿真时间、车辆数、平均速度等
-- **状态信息**: 当前仿真状态和最后更新时间
+### Main Interface
+- **Map View**: Real-time simulation scene display
+- **Statistics**: Simulation time, vehicle count, average speed, etc.
+- **Status Info**: Current simulation status and last update time
 
-## 车辆颜色说明
-- 🔴 红色三角形：AV（自动驾驶车辆）
-- 🔵 蓝色三角形：BV（背景车辆）
-- 🟢 绿色三角形：其他车辆
-- 🟠 橙色圆形：VRU（行人/骑行者）
+## Vehicle Color Legend
+- 🔴 Red Triangle: AV (Autonomous Vehicle)
+- 🔵 Blue Triangle: BV (Background Vehicle)
+- 🟢 Green Triangle: Other vehicles
+- 🟠 Orange Circle: VRU (Vulnerable Road User - pedestrian/cyclist)
 
-## 使用示例
+## Usage Examples
 
-### 示例1：手动控制模式
+### Example 1: Manual Control Mode
 ```bash
-# 运行测试脚本
+# Run test script
 python test_visualization.py
-# 选择 1 (Manual control)
+# Select 1 (Manual control)
 ```
 
-### 示例2：自动运行模式
+### Example 2: Auto-run Mode
 ```bash
-# 运行测试脚本
+# Run test script
 python test_visualization.py
-# 选择 2 (Auto-run mode)
+# Select 2 (Auto-run mode)
 ```
 
-### 示例3：使用不同端口
+### Example 3: Using Different Port
 ```python
-# 如果8501端口被占用，使用其他端口
+# If port 8050 is occupied, use another port
 response = requests.post("http://localhost:8000/start_simulation", 
     json={"config_file": "./config.yaml", "auto_run": True}, 
-    params={"enable_viz": True, "viz_port": 8502}
+    params={"enable_viz": True, "viz_port": 8052}
 )
 ```
 
-## 技术细节
+## Technical Details
 
-### 数据流
-1. CoSim插件在启动时提取地图数据（如果启用可视化）
-2. CoSim插件每步收集仿真数据并写入Redis
-3. Streamlit应用从Redis读取数据并实时渲染
+### Data Flow
+1. CoSim plugin extracts map data on startup (if visualization enabled)
+2. CoSim plugin collects simulation data each step and writes to Redis
+3. Dash application reads data from Redis and renders in real-time
 
-### 架构优势
-- **集成设计**：可视化作为CoSim插件的可选功能
-- **向后兼容**：不启用时行为与原来完全一致
-- **资源优化**：复用现有数据收集机制
+### Architecture Advantages
+- **Integrated Design**: Visualization as optional feature of CoSim plugin
+- **Backward Compatible**: Behaves identically when disabled
+- **Resource Optimized**: Reuses existing data collection mechanism
 
-### 性能优化
-- 地图数据只在启动时提取一次
-- 可配置更新频率以平衡性能和实时性
-- 使用Plotly优化渲染性能
+### Performance Optimization
+- Map data extracted only once at startup
+- Configurable update frequency to balance performance and real-time updates
+- Uses Plotly for optimized rendering performance
 
-## 故障排除
+## Troubleshooting
 
-### Streamlit无法启动
-- 检查端口是否被占用
-- 确保已安装依赖：`pip install streamlit plotly`
+### Dash Cannot Start
+- Check if port is occupied
+- Ensure dependencies installed: `pip install dash plotly`
 
-### 无法看到车辆
-- 确认仿真正在运行
-- 检查Redis连接是否正常
-- 查看浏览器控制台错误信息
+### Cannot See Vehicles
+- Confirm simulation is running
+- Check Redis connection status
+- View browser console for error messages
 
-### 性能问题
-- 增大`viz_update_freq`值减少更新频率
-- 关闭不需要的显示选项
-- 使用更小的仿真场景测试
+### Performance Issues
+- Increase `viz_update_freq` value to reduce update frequency
+- Disable unnecessary display options
+- Test with smaller simulation scenarios

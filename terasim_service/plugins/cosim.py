@@ -120,7 +120,7 @@ class TeraSimCoSimPlugin(BasePlugin):
         key_expiry=3600,
         auto_run=False,
         enable_viz=False,
-        viz_port=8501,
+        viz_port=8050,
         viz_update_freq=5,
     ):
         """Initialize the Co-Simulation plugin.
@@ -133,7 +133,7 @@ class TeraSimCoSimPlugin(BasePlugin):
             key_expiry (int, optional): Key expiration time in seconds. Defaults to 3600.
             auto_run (bool, optional): Flag to enable auto-run mode. Defaults to False.
             enable_viz (bool, optional): Enable visualization with Streamlit. Defaults to False.
-            viz_port (int, optional): Port for Streamlit server. Defaults to 8501.
+            viz_port (int, optional): Port for Streamlit server. Defaults to 8050.
             viz_update_freq (int, optional): Visualization update frequency. Defaults to 5.
         """
         super().__init__(simulation_uuid, plugin_config, redis_config)
