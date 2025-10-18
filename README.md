@@ -1,4 +1,6 @@
 # TeraSim Service
+> **This repository has been archived.**  
+> Further development continues at [mcity/TeraSim](https://github.com/mcity/TeraSim).
 
 A HTTP service for TeraSim simulation control and monitoring, built with FastAPI.
 
